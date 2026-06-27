@@ -1,0 +1,1017 @@
+:root {
+  --bg: #ffffff;
+  --ink: #111111;
+  --muted: #6b6b6b;
+  --line: #e7e7e7;
+  --accent: #111111;
+  --sale: #9a1b1b;
+  --header-h: 84px;
+  --font: "Helvetica Neue", "Inter", -apple-system, BlinkMacSystemFont, Arial,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.upper {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.tiny {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---------- Announcement bar ---------- */
+.announce {
+  background: #111;
+  color: #fff;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 9px 12px;
+}
+
+/* ---------- Header ---------- */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  transition: color 0.35s ease;
+}
+/* Glass / scrim lives on a backdrop layer that fades between states */
+.header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transition: opacity 0.35s ease;
+  opacity: 1;
+}
+/* Solid state — frosted light glass */
+.header--solid::before {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+/* Transparent state — soft dark scrim over the hero for legibility */
+.header--transparent::before {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.38),
+    rgba(0, 0, 0, 0)
+  );
+}
+.header-inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: var(--header-h);
+}
+.header-left {
+  display: flex;
+  align-items: center;
+}
+.nav {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+}
+.nav a,
+.nav .navitem {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: inherit;
+  position: relative;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.nav .navitem::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.nav .navitem:hover::after {
+  transform: scaleX(1);
+}
+.logo {
+  justify-self: center;
+}
+.logo img {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  transition: filter 0.35s ease;
+}
+.header-actions {
+  justify-self: end;
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+.icon-btn {
+  background: none;
+  border: 0;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  position: relative;
+  color: inherit;
+}
+.cart-count {
+  margin-left: 4px;
+}
+
+/* ----- header color states ----- */
+.header--solid {
+  color: var(--ink);
+}
+.header--transparent {
+  color: #fff;
+}
+/* overlay state — header merges into the dark full-screen menu */
+.header--overlay {
+  color: #fff;
+}
+.header--overlay::before {
+  opacity: 0;
+}
+/* dark logo by default; invert to white over hero or dark overlay */
+.header--transparent .logo img,
+.header--overlay .logo img {
+  filter: brightness(0) invert(1);
+}
+
+/* ----- animated burger (mobile) ----- */
+.burger {
+  display: none;
+  position: relative;
+  width: 26px;
+  height: 16px;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.burger span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1.4px;
+  background: currentColor;
+  transition: transform 0.3s ease, opacity 0.3s ease, top 0.3s ease;
+}
+.burger span:nth-child(1) {
+  top: 3px;
+}
+.burger span:nth-child(2) {
+  top: 11px;
+}
+.burger.is-open span:nth-child(1) {
+  top: 7px;
+  transform: rotate(45deg);
+}
+.burger.is-open span:nth-child(2) {
+  top: 7px;
+  transform: rotate(-45deg);
+}
+
+/* push non-home pages below the fixed header */
+.page-offset {
+  padding-top: var(--header-h);
+}
+
+/* dropdown */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid var(--line);
+  min-width: 180px;
+  padding: 14px 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+}
+.dropdown:hover .dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+}
+.dropdown-menu a {
+  display: block;
+  padding: 8px 22px;
+  font-size: 11px;
+}
+.dropdown-menu a:hover {
+  background: #f6f6f6;
+}
+
+/* ---------- Full-screen overlay menu (mobile) ---------- */
+.overlay-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(14, 14, 14, 0.97);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+.overlay-menu.open {
+  opacity: 1;
+  visibility: visible;
+}
+.overlay-inner {
+  width: 100%;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+}
+.overlay-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.overlay-label {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #777;
+  margin: 26px 0 12px;
+}
+.overlay-label:first-child {
+  margin-top: 0;
+}
+.overlay-nav a {
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.overlay-menu.open .overlay-nav a {
+  opacity: 1;
+  transform: translateY(0);
+}
+.overlay-nav a:active {
+  color: #bbb;
+}
+.overlay-foot {
+  position: absolute;
+  bottom: 38px;
+  left: 32px;
+  display: flex;
+  gap: 26px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #aaa;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  height: 88vh;
+  min-height: 480px;
+  overflow: hidden;
+  background: #ddd;
+}
+/* Hero sits at the very top; the fixed header floats over it */
+.hero-bleed {
+  margin-top: 0;
+}
+.hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: center;
+  padding-bottom: 72px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0) 45%
+  );
+  color: #fff;
+}
+.hero-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: 16px;
+}
+.hero-display {
+  font-size: 76px;
+  font-weight: 300;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  margin-bottom: 30px;
+  text-indent: 0.16em;
+}
+.hero-overlay h1 {
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin: 0 0 18px;
+}
+.btn-light {
+  display: inline-block;
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 13px 34px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-light:hover {
+  background: #fff;
+  color: #111;
+}
+
+/* ---------- Philosophy strip ---------- */
+.philosophy {
+  text-align: center;
+  padding: 80px 20px;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.philosophy p {
+  font-size: 17px;
+  line-height: 1.9;
+  color: #2a2a2a;
+}
+
+/* ---------- Section heading ---------- */
+.section {
+  padding-top: 30px;
+  padding-bottom: 70px;
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 28px;
+}
+.section-head h2 {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0;
+}
+.section-head a {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+}
+
+/* ---------- Product grid ---------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px 22px;
+}
+.card {
+  display: block;
+}
+.card-media {
+  position: relative;
+  background: #f4f4f4;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+}
+.card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.4s ease;
+}
+.card-media img.alt {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.card:hover .card-media img.alt {
+  opacity: 1;
+}
+.card-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #111;
+  color: #fff;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+}
+.card-badge.sold {
+  background: #777;
+}
+.card-info {
+  padding: 14px 2px 0;
+}
+.card-info .title {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+}
+.card-info .price {
+  font-size: 12.5px;
+  color: #333;
+}
+
+/* ---------- Collection page ---------- */
+.collection-head {
+  text-align: center;
+  padding: 56px 0 30px;
+}
+.collection-head h1 {
+  font-size: 22px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.collection-head .count {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- Product page ---------- */
+.pdp {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 56px;
+  padding-top: 44px;
+  padding-bottom: 80px;
+}
+.pdp-gallery {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.pdp-gallery .main {
+  background: #f4f4f4;
+  aspect-ratio: 3 / 4;
+}
+.pdp-gallery .main img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pdp-thumbs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pdp-thumbs button {
+  width: 70px;
+  height: 90px;
+  border: 1px solid var(--line);
+  padding: 0;
+  background: #f4f4f4;
+  overflow: hidden;
+}
+.pdp-thumbs button.active {
+  border-color: #111;
+}
+.pdp-thumbs img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pdp-info {
+  position: sticky;
+  top: 110px;
+  align-self: start;
+}
+.pdp-info .vendor {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.pdp-info h1 {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin: 0 0 14px;
+}
+.pdp-price {
+  font-size: 18px;
+  margin-bottom: 26px;
+}
+.size-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sizes {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.size {
+  min-width: 52px;
+  padding: 12px 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.size.active {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+.size.disabled {
+  color: #c4c4c4;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.btn-dark {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: 0;
+  padding: 16px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: opacity 0.2s;
+}
+.btn-dark:hover {
+  opacity: 0.85;
+}
+.btn-dark:disabled {
+  background: #bbb;
+  cursor: not-allowed;
+}
+.pdp-desc {
+  margin-top: 34px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  font-size: 14px;
+  color: #333;
+}
+.pdp-desc .disclaimer {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Cart drawer ---------- */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s;
+}
+.drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 400px;
+  max-width: 90vw;
+  background: #fff;
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open {
+  transform: translateX(0);
+}
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.drawer-head h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 24px;
+}
+.drawer-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 60px 0;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+.line {
+  display: flex;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.line img {
+  width: 72px;
+  height: 92px;
+  object-fit: cover;
+  background: #f4f4f4;
+}
+.line-info {
+  flex: 1;
+}
+.line-info .t {
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+.line-info .s {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  margin-top: 8px;
+}
+.qty button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: none;
+  font-size: 14px;
+}
+.qty span {
+  width: 30px;
+  text-align: center;
+  font-size: 12px;
+}
+.line-remove {
+  background: none;
+  border: 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.drawer-foot {
+  border-top: 1px solid var(--line);
+  padding: 20px 24px 26px;
+}
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.drawer-note {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 12px;
+}
+
+/* ---------- Footer ---------- */
+.footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding: 64px 0 30px;
+  background: #fafafa;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 40px;
+}
+.footer h4 {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin: 0 0 18px;
+}
+.footer-connect h3 {
+  font-size: 20px;
+  font-weight: 400;
+  margin: 0 0 14px;
+}
+.footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.footer ul li {
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: #444;
+}
+.newsletter {
+  display: flex;
+  border-bottom: 1px solid #111;
+  max-width: 340px;
+}
+.newsletter input {
+  flex: 1;
+  border: 0;
+  background: none;
+  padding: 10px 0;
+  font-size: 13px;
+  outline: none;
+}
+.newsletter button {
+  background: none;
+  border: 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.footer-bottom {
+  margin-top: 50px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- About ---------- */
+.about {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 80px 0;
+  text-align: center;
+}
+.about h1 {
+  font-size: 22px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.about p {
+  font-size: 16px;
+  line-height: 1.9;
+  color: #333;
+  margin-top: 22px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 820px) {
+  :root {
+    --header-h: 62px;
+  }
+  .wrap {
+    padding: 0 18px;
+  }
+
+  /* ---- header ---- */
+  .nav {
+    display: none;
+  }
+  .burger {
+    display: block;
+  }
+  .header-left {
+    justify-self: start;
+  }
+  .logo img {
+    height: 26px;
+  }
+  .header-actions {
+    gap: 16px;
+  }
+  .shop-link {
+    display: none;
+  }
+
+  /* ---- hero: full-screen, cinematic ---- */
+  .hero {
+    height: 100svh;
+    min-height: 560px;
+  }
+  .hero img {
+    object-position: 50% 30%;
+  }
+  .hero-overlay {
+    justify-content: center;
+    align-items: flex-start;
+    text-align: left;
+    padding: 0 26px 0;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.55),
+      rgba(0, 0, 0, 0.05) 55%,
+      rgba(0, 0, 0, 0.35)
+    );
+  }
+  .hero-overlay .hero-eyebrow {
+    display: block;
+  }
+  .hero-overlay h1 {
+    font-size: 13px;
+    letter-spacing: 0.34em;
+    margin: 0 0 20px;
+    align-self: center;
+  }
+  .hero-overlay .hero-display {
+    display: block;
+    font-size: 15vw;
+    line-height: 0.98;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    margin-bottom: 26px;
+  }
+  .btn-light {
+    align-self: stretch;
+    text-align: center;
+    padding: 15px 0;
+  }
+
+  /* ---- content rhythm ---- */
+  .philosophy {
+    padding: 60px 22px;
+  }
+  .philosophy p {
+    font-size: 16px;
+    line-height: 1.85;
+  }
+  .section {
+    padding-top: 14px;
+    padding-bottom: 44px;
+  }
+  .section-head {
+    margin-bottom: 18px;
+  }
+  .section-head h2 {
+    font-size: 12px;
+  }
+
+  /* ---- product grid ---- */
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px 12px;
+  }
+  .card-info {
+    padding-top: 11px;
+  }
+  .card-info .title {
+    font-size: 12px;
+  }
+
+  /* ---- collection ---- */
+  .collection-head {
+    padding: 40px 0 22px;
+  }
+  .collection-head h1 {
+    font-size: 17px;
+    letter-spacing: 0.18em;
+  }
+
+  /* ---- pdp ---- */
+  .pdp {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-top: 20px;
+    padding-bottom: 64px;
+  }
+  .pdp-info {
+    position: static;
+  }
+  .pdp-info h1 {
+    font-size: 21px;
+  }
+  .pdp-gallery .main {
+    margin: 0 -18px;
+    aspect-ratio: 4 / 5;
+  }
+  .pdp-thumbs {
+    margin-top: 2px;
+  }
+
+  /* ---- footer ---- */
+  .footer {
+    padding: 50px 0 26px;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .grid {
+    gap: 26px 10px;
+  }
+}

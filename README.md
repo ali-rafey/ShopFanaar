@@ -1,0 +1,64 @@
+# Fänaar — React Storefront
+
+A standalone React storefront mirroring the design and catalog of the
+[shopfanaar.com](https://www.shopfanaar.com) Shopify store. It runs entirely on
+its own — no Shopify API calls at runtime. The catalog (products, prices,
+images, collections, inventory) lives in `src/data/store.js`.
+
+## Tech
+
+- React 18 + React Router 6
+- Vite 5 (build tooling)
+- Plain CSS (no framework), client-side cart with `localStorage`
+
+## Local development
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build → dist/
+npm run preview  # serve the production build locally
+```
+
+## Deploy to Vercel
+
+This repo is Vercel-ready: `vercel.json` configures SPA routing (so deep links
+like `/products/...` resolve on refresh) and long-term caching for hashed
+assets. Vercel auto-detects the Vite framework, so no extra build settings are
+needed.
+
+**Option A — Vercel CLI**
+
+```bash
+npm i -g vercel        # once
+vercel                 # link/create project (follow prompts)
+vercel --prod          # deploy to production
+```
+
+**Option B — Git + Vercel dashboard**
+
+1. Push this repo to GitHub/GitLab/Bitbucket.
+2. In the Vercel dashboard: **Add New → Project → Import** the repo.
+3. Framework preset: **Vite** (auto-detected). Build: `npm run build`,
+   Output: `dist`. Click **Deploy**.
+
+After the first deploy, update the `canonical` and `og:*` URLs in
+[`index.html`](index.html) to your real domain.
+
+## Production notes
+
+- **Routing:** `vercel.json` rewrites all paths to `index.html` for the SPA;
+  a `*` route renders a styled 404 page.
+- **Images:** product imagery is served from Shopify's public CDN
+  (`cdn.shopify.com`) to stay faithful to the original. To be fully
+  self-hosted, download them into `public/` and update the URLs in
+  `src/data/store.js`. The logo is already local (`public/logo.png`).
+- **Checkout** is intentionally not wired to a payment provider (demo notice).
+- The `npm audit` warnings are in dev-only tooling (Vite/esbuild) and are not
+  part of the shipped static bundle.
+
+## Editing the catalog
+
+Everything is data-driven from `src/data/store.js` — edit products,
+collections, prices, sizes, and the hero image there; nothing else needs to
+change.
