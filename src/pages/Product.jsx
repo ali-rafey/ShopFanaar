@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getProduct, formatPrice, shop } from "../data/store";
 import { useCart } from "../context/CartContext";
+import { trackViewContent } from "../lib/pixel";
 
 export default function Product() {
   const { handle } = useParams();
@@ -14,6 +15,8 @@ export default function Product() {
     setActive(0);
     setSize(null);
     window.scrollTo(0, 0);
+    if (product) trackViewContent(product);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handle]);
 
   if (!product) {

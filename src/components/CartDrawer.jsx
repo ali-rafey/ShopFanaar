@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { formatPrice } from "../data/store";
+import { trackInitiateCheckout } from "../lib/pixel";
 
 export default function CartDrawer() {
   const { items, open, setOpen, updateQty, remove, subtotal } = useCart();
@@ -56,7 +57,12 @@ export default function CartDrawer() {
             </div>
             <button
               className="btn-dark"
-              onClick={() => alert("This is an independent demo store — checkout is not connected.")}
+              onClick={() => {
+                trackInitiateCheckout(items, subtotal);
+                alert(
+                  "This is an independent demo store — checkout is not connected."
+                );
+              }}
             >
               Checkout
             </button>

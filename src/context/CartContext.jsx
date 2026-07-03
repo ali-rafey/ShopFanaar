@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { trackAddToCart } from "../lib/pixel";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "fanaar-cart";
@@ -19,6 +20,7 @@ export function CartProvider({ children }) {
 
   function add(product, size, qty = 1) {
     const key = `${product.id}-${size}`;
+    trackAddToCart(product, size, qty);
     setItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
