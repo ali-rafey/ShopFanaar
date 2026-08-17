@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { heroImage, shop, getCollection } from "../data/store";
 import ProductCard from "../components/ProductCard";
+import Reveal from "../components/Reveal";
 
 export default function Home() {
   const featured = getCollection("landing-page-collection").items;
@@ -19,30 +20,36 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="philosophy">
-        <p>{shop.tagline}</p>
-      </section>
+      <Reveal>
+        <section className="philosophy">
+          <p>{shop.tagline}</p>
+        </section>
+      </Reveal>
 
       <section className="wrap section">
-        <div className="section-head">
-          <h2>New In</h2>
-          <Link to="/collections/landing-page-collection">View All</Link>
-        </div>
+        <Reveal>
+          <div className="section-head">
+            <h2>New In</h2>
+            <Link to="/collections/landing-page-collection">View All</Link>
+          </div>
+        </Reveal>
         <div className="grid">
-          {featured.slice(0, 8).map((p) => (
-            <ProductCard key={p.id} product={p} />
+          {featured.slice(0, 6).map((p, i) => (
+            <ProductCard key={p.id} product={p} index={i} />
           ))}
         </div>
       </section>
 
       <section className="wrap section">
-        <div className="section-head">
-          <h2>Autonomy — Drop Needle</h2>
-          <Link to="/collections/frontpage">View All</Link>
-        </div>
+        <Reveal>
+          <div className="section-head">
+            <h2>Autonomy — Drop Needle</h2>
+            <Link to="/collections/frontpage">View All</Link>
+          </div>
+        </Reveal>
         <div className="grid">
-          {dropNeedle.map((p) => (
-            <ProductCard key={p.id} product={p} />
+          {dropNeedle.map((p, i) => (
+            <ProductCard key={p.id} product={p} index={i} />
           ))}
         </div>
       </section>

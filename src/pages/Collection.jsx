@@ -9,19 +9,20 @@ export default function Collection() {
   return (
     <div className="wrap">
       <div className="collection-head">
+        <span className="eyebrow">Fänaar</span>
         <h1>{meta ? meta.title : "Collection"}</h1>
         <div className="count">
-          {items.length} {items.length === 1 ? "Product" : "Products"}
+          {items.length} {items.length === 1 ? "Piece" : "Pieces"}
         </div>
       </div>
       {items.length === 0 ? (
-        <p style={{ textAlign: "center", padding: "60px 0", color: "#777" }}>
+        <p style={{ textAlign: "center", padding: "80px 0", color: "#8c8376" }}>
           No products in this collection.
         </p>
       ) : (
-        <div className="grid" style={{ paddingBottom: 80 }}>
-          {items.map((p) => (
-            <ProductCard key={p.id} product={p} />
+        <div className="grid" style={{ paddingBottom: 110 }}>
+          {items.map((p, i) => (
+            <ProductCard key={p.id} product={p} index={i} />
           ))}
         </div>
       )}

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { initPixel } from "./lib/pixel.js";
+import "./fonts.css";
 import "./styles.css";
 
 initPixel();
