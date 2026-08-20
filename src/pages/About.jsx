@@ -13,7 +13,7 @@ export default function About() {
 
       <Reveal>
         <section className="wrap about-figure">
-          <img src={craft.image} alt="Fänaar fabrication" loading="lazy" />
+          <img src={craft.image} alt="Fanaar fabrication" loading="lazy" />
         </section>
       </Reveal>
 
@@ -22,7 +22,7 @@ export default function About() {
           <div className="about-col">
             <h2>Made, not sourced</h2>
             <p>
-              Fänaar is a menswear label built in Faisalabad — a city that has
+              Fanaar is a menswear label built in Faisalabad — a city that has
               spun and woven cloth for generations. We develop our own
               fabrications rather than buying them finished, which means the
               texture of a piece is decided at the machine, in the yarn, long
@@ -61,7 +61,7 @@ export default function About() {
           <div className="lookboard">
             {lookbook.slice(0, 6).map((src) => (
               <div className="lookpin" key={src}>
-                <img src={src} alt="Fänaar" loading="lazy" />
+                <img src={src} alt="Fanaar" loading="lazy" />
               </div>
             ))}
           </div>

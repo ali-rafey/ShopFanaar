@@ -1,14 +1,14 @@
-// Catalog data copied from the Fänaar Shopify store (www.shopfanaar.com)
+// Catalog data copied from the Fanaar Shopify store (www.shopfanaar.com)
 // via the Shopify Admin connector. Images are self-hosted in /public/images.
 // This file makes the React store fully independent — no live API calls.
 
 export const shop = {
-  name: "Fänaar",
+  name: "Fanaar",
   logo: "/logo.png",
   currency: "PKR",
   currencySymbol: "Rs.",
   tagline:
-    "Fänaar draws inspiration from the deeper science of apparel — exploring how clothing interacts with the body and shapes the way we feel and live.",
+    "Fanaar draws inspiration from the deeper science of apparel — exploring how clothing interacts with the body and shapes the way we feel and live.",
   origin: "established from Faisalabad",
   social: {
     instagram: "https://www.instagram.com/",
@@ -54,9 +54,9 @@ export const categoryTiles = [
   },
 ];
 
-// Editorial feature — "Autonomy by Fänaar" (fabrication story).
+// Editorial feature — "Autonomy by Fanaar" (fabrication story).
 export const craft = {
-  eyebrow: "Autonomy by Fänaar",
+  eyebrow: "Autonomy by Fanaar",
   title: "Knitting & Weaving",
   body: "Autonomy is where the garment begins — at the yarn. Drop needle ribs, micro-block textures and waffle thermals are engineered on the machine, not printed on the surface. The structure is the design.",
   image: "/images/micro-block-drop-needle-knit-3.webp",
@@ -342,4 +342,16 @@ export function getProductsByIds(ids = []) {
 
 export function totalStock(product) {
   return product.sizes.reduce((n, s) => n + s.qty, 0);
+}
+
+// Sibling colourways: titles formatted "Base Name - Colour" group together.
+export function getColorways(product) {
+  if (!product || !product.title.includes(" - ")) return [];
+  const base = product.title.split(" - ")[0].trim();
+  return products
+    .filter((p) => p.title.startsWith(base + " - "))
+    .map((p) => ({
+      ...p,
+      colorName: p.title.split(" - ").slice(1).join(" - ").trim(),
+    }));
 }

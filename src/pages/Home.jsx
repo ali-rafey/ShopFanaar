@@ -21,7 +21,7 @@ export default function Home() {
       <section className="hero-split wrap">
         <div className="hero-copy">
           <span className="eyebrow">{shop.origin}</span>
-          <h1 className="hero-display">FÄNAAR</h1>
+          <h1 className="hero-display">FANAAR</h1>
           <p className="hero-sub">
             The science of apparel — garments engineered for how they feel,
             move and last.
@@ -36,7 +36,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-media">
-          <img src={heroImage} alt="Fänaar" fetchpriority="high" />
+          <img src={heroImage} alt="Fanaar" fetchpriority="high" />
         </div>
       </section>
 
@@ -134,7 +134,7 @@ export default function Home() {
         <div className="lookboard">
           {lookbook.map((src, i) => (
             <Reveal key={src} delay={(i % 3) * 70} className="lookpin">
-              <img src={src} alt="Fänaar lookbook" loading="lazy" />
+              <img src={src} alt="Fanaar lookbook" loading="lazy" />
             </Reveal>
           ))}
         </div>

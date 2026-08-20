@@ -55,7 +55,7 @@ export default function Footer() {
       </div>
 
       <div className="wrap footer-bottom">
-        <span>© {new Date().getFullYear()}, Fänaar</span>
+        <span>© {new Date().getFullYear()}, Fanaar</span>
         <span>Faisalabad, Pakistan</span>
       </div>
     </footer>

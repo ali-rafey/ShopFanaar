@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap";
+  "https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,400&family=Inter:wght@300;400;500;600&display=swap";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
@@ -27,6 +27,10 @@ for (const b of blocks) {
   const range = /unicode-range:\s*([^;]+);/.exec(b)?.[1];
   const url = /url\((https:[^)]+\.woff2)\)/.exec(b)?.[1];
   if (!fam || !url) continue;
+
+  // Latin only — skip cyrillic / greek / vietnamese subsets to keep the
+  // repo small. The site's copy is Latin (incl. "Piqué").
+  if (range && /U\+(0400|0370|1EA0|0460|03A3)/.test(range)) continue;
 
   const fname = `${fam.replace(/\s+/g, "")}-${weight}-${style}-${i++}.woff2`;
   const buf = Buffer.from(

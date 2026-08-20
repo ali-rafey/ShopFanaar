@@ -7,8 +7,8 @@
   --muted: #8f8f8f;
   --line: #ebebeb;
 
-  --serif: "Cormorant Garamond", "Times New Roman", Georgia, serif;
-  --sans: "Jost", "Helvetica Neue", Arial, sans-serif;
+  --serif: "Bodoni Moda", "Didot", "Bodoni MT", "Times New Roman", serif;
+  --sans: "Inter", "Helvetica Neue", Arial, sans-serif;
 
   --header-h: 88px;
   --r-pin: 14px;
@@ -1012,43 +1012,137 @@ button {
   padding-top: 32px;
   padding-bottom: 100px;
 }
+/* Desktop: an immersive stack of full-size shots you scroll through. */
 .pdp-gallery {
   display: grid;
   gap: 14px;
 }
-.pdp-gallery .main {
+.pdp-shot {
+  margin: 0;
   background: var(--media);
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
   border-radius: 18px;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
 }
-.pdp-gallery .main img {
+.pdp-shot img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.pdp-thumbs {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+.pdp-dots {
+  display: none;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
 }
-.pdp-thumbs button {
-  width: 74px;
-  height: 94px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+.dot {
+  width: 7px;
+  height: 7px;
   padding: 0;
-  background: var(--media);
+  border: 0;
+  border-radius: 999px;
+  background: #d6d6d6;
+  transition: background 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.dot.active {
+  background: var(--ink);
+  transform: scale(1.25);
+}
+
+/* Colourway swatches */
+.colorways {
+  margin-bottom: 26px;
+}
+.colorways .size-label {
+  display: block;
+  margin-bottom: 12px;
+}
+.swatches {
+  display: flex;
+  gap: 10px;
+}
+.swatch {
+  width: 52px;
+  height: 64px;
+  border-radius: 8px;
   overflow: hidden;
+  background: var(--media);
+  border: 1px solid var(--line);
   transition: border-color 0.3s var(--ease);
 }
-.pdp-thumbs button.active {
-  border-color: var(--ink);
-}
-.pdp-thumbs img {
+.swatch img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.swatch:hover {
+  border-color: #bdbdbd;
+}
+.swatch.active {
+  border-color: var(--ink);
+}
+
+/* Assurances */
+.pdp-assurances {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.pdp-assurances li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 7px;
+}
+.pdp-assurances li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #c9c9c9;
+}
+
+/* Sticky mobile buy bar */
+.buybar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line);
+}
+.buybar-info {
+  flex: 1;
+  min-width: 0;
+}
+.buybar-title {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.buybar-price {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--ink-soft);
+}
+.buybar .btn-solid {
+  flex: none;
+  padding: 13px 26px;
 }
 .pdp-info {
   position: sticky;
@@ -1661,7 +1755,7 @@ button {
     grid-template-columns: 1fr;
     gap: 24px;
     padding-top: 18px;
-    padding-bottom: 70px;
+    padding-bottom: 92px; /* clear the sticky buy bar */
   }
   .pdp-info {
     position: static;
@@ -1671,6 +1765,53 @@ button {
   }
   .pdp-actions .btn-outline {
     width: 100%;
+  }
+  /* Mobile: swipeable snap carousel instead of the stack */
+  .pdp-media {
+    margin: 0 -20px;
+  }
+  /* Full-bleed: each shot is exactly one container width, no gap/padding,
+     so scrollLeft / clientWidth maps 1:1 to the active dot. */
+  .pdp-gallery {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .pdp-gallery::-webkit-scrollbar {
+    display: none;
+  }
+  .pdp-shot {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    border-radius: 0;
+  }
+  .pdp-dots {
+    display: flex;
+  }
+  .buybar.show {
+    display: flex;
+    animation: barUp 0.35s var(--ease) both;
+  }
+  @keyframes barUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  /* keep breadcrumbs to a single tidy line */
+  .crumbs {
+    flex-wrap: nowrap;
+    font-size: 10px;
+    padding-top: 18px;
+  }
+  .crumbs .current {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .about-hero {

@@ -45,7 +45,7 @@ export default function Collection() {
       </nav>
 
       <div className="collection-head">
-        <span className="eyebrow">Fänaar</span>
+        <span className="eyebrow">Fanaar</span>
         <h1>{meta ? meta.title : "Collection"}</h1>
         <div className="count">
           {items.length} {items.length === 1 ? "piece" : "pieces"}

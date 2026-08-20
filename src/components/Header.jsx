@@ -130,7 +130,7 @@ export default function Header() {
                 onFocus={() => openMega("shop")}
                 onClick={() => setMega((m) => (m === "shop" ? null : "shop"))}
               >
-                Shop Fänaar
+                Shop Fanaar
               </button>
               <button
                 className={`navitem ${mega === "autonomy" ? "is-active" : ""}`}
@@ -164,7 +164,7 @@ export default function Header() {
             </button>
           </div>
 
-          <Link to="/" className="logo" aria-label="Fänaar — home">
+          <Link to="/" className="logo" aria-label="Fanaar — home">
             <img src={shop.logo} alt={shop.name} />
           </Link>
 
@@ -229,7 +229,7 @@ export default function Header() {
             {mega === "autonomy" && (
               <>
                 <div className="mega-col">
-                  <span className="mega-label">Autonomy by Fänaar</span>
+                  <span className="mega-label">Autonomy by Fanaar</span>
                   <ul className="mega-list">
                     <li>
                       <Link to="/collections/frontpage">Drop Needle</Link>
@@ -274,7 +274,7 @@ export default function Header() {
                 {l.label}
               </Link>
             ))}
-            <span className="overlay-label">Autonomy by Fänaar</span>
+            <span className="overlay-label">Autonomy by Fanaar</span>
             <Link
               to="/collections/frontpage"
               style={{ transitionDelay: `${0.05 + SHOP_LINKS.length * 0.035}s` }}

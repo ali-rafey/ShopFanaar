@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   getProduct,
   getRelated,
+  getColorways,
   formatPrice,
   shop,
   collections as allCollections,
@@ -19,14 +20,32 @@ export default function Product() {
   const { add } = useCart();
   const { isSaved, toggle } = useSaved();
 
-  const [active, setActive] = useState(0);
   const [size, setSize] = useState(null);
   const [openPanel, setOpenPanel] = useState("details");
+  const [shot, setShot] = useState(0);
+  const [showBar, setShowBar] = useState(false);
+  const galleryRef = useRef(null);
+  const actionsRef = useRef(null);
+
+  // Show the sticky buy bar only once the real Add-to-cart has scrolled away.
+  // If the observer never fires the bar simply stays hidden — the in-page
+  // button is always available, so this can't strand the user.
+  useEffect(() => {
+    const el = actionsRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([e]) => setShowBar(!e.isIntersecting && e.boundingClientRect.top < 0),
+      { threshold: 0 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [handle]);
 
   useEffect(() => {
-    setActive(0);
     setSize(null);
+    setShot(0);
     window.scrollTo(0, 0);
+    if (galleryRef.current) galleryRef.current.scrollLeft = 0;
     if (product) trackViewContent(product);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handle]);
@@ -34,7 +53,7 @@ export default function Product() {
   if (!product) {
     return (
       <div className="wrap empty-state" style={{ padding: "120px 0" }}>
-        <p className="empty-lead">Product not found</p>
+        <h1 className="empty-lead">Product not found</h1>
         <p className="empty-sub">
           This piece may have moved or sold out permanently.
         </p>
@@ -49,9 +68,29 @@ export default function Product() {
   const canAdd = selected && selected.qty > 0;
   const saved = isSaved(product.id);
   const related = getRelated(product, 3);
+  const colorways = getColorways(product);
 
   const primary = product.collections[0];
   const crumb = allCollections.find((c) => c.handle === primary);
+
+  // When colourways exist the swatches carry the colour, so the heading
+  // drops the " - Colour" suffix instead of wrapping on the hyphen.
+  const activeColor = colorways.find((c) => c.id === product.id)?.colorName;
+  const heading =
+    colorways.length > 1 ? product.title.split(" - ")[0].trim() : product.title;
+
+  // Mobile carousel dot tracking
+  const onGalleryScroll = (e) => {
+    const el = e.currentTarget;
+    if (el.clientWidth === 0) return;
+    setShot(Math.round(el.scrollLeft / el.clientWidth));
+  };
+  const goToShot = (i) => {
+    const el = galleryRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+    setShot(i);
+  };
 
   return (
     <>
@@ -59,32 +98,44 @@ export default function Product() {
         <nav className="crumbs" aria-label="Breadcrumb">
           <Link to="/">Home</Link>
           <span aria-hidden="true">/</span>
-          {crumb ? (
+          {crumb && (
             <>
               <Link to={`/collections/${crumb.handle}`}>{crumb.title}</Link>
               <span aria-hidden="true">/</span>
             </>
-          ) : null}
+          )}
           <span className="current">{product.title}</span>
         </nav>
       </div>
 
       <div className="wrap pdp">
-        <div className="pdp-gallery">
-          <div className="main">
-            <img src={product.images[active]} alt={product.title} />
+        <div className="pdp-media">
+          <div
+            className="pdp-gallery"
+            ref={galleryRef}
+            onScroll={onGalleryScroll}
+          >
+            {product.images.map((img, i) => (
+              <figure className="pdp-shot" key={img}>
+                <img
+                  src={img}
+                  alt={`${product.title} — view ${i + 1}`}
+                  loading={i === 0 ? "eager" : "lazy"}
+                />
+              </figure>
+            ))}
           </div>
           {product.images.length > 1 && (
-            <div className="pdp-thumbs">
+            <div className="pdp-dots" role="tablist" aria-label="Product images">
               {product.images.map((img, i) => (
                 <button
                   key={img}
-                  className={i === active ? "active" : ""}
-                  aria-label={`View image ${i + 1}`}
-                  onClick={() => setActive(i)}
-                >
-                  <img src={img} alt="" aria-hidden="true" />
-                </button>
+                  className={`dot ${i === shot ? "active" : ""}`}
+                  aria-label={`Go to image ${i + 1}`}
+                  aria-selected={i === shot}
+                  role="tab"
+                  onClick={() => goToShot(i)}
+                />
               ))}
             </div>
           )}
@@ -92,13 +143,30 @@ export default function Product() {
 
         <div className="pdp-info">
           <div className="vendor">{shop.name}</div>
-          <h1>{product.title}</h1>
+          <h1>{heading}</h1>
           <div className="pdp-price">{formatPrice(product.price)}</div>
 
+          {colorways.length > 1 && (
+            <div className="colorways">
+              <span className="size-label">Colour: {activeColor}</span>
+              <div className="swatches">
+                {colorways.map((c) => (
+                  <Link
+                    key={c.id}
+                    to={`/products/${c.handle}`}
+                    className={`swatch ${c.id === product.id ? "active" : ""}`}
+                    title={c.colorName}
+                    aria-label={c.colorName}
+                  >
+                    <img src={c.images[0]} alt="" aria-hidden="true" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="size-row">
-            <span className="size-label">
-              Size{size ? `: ${size}` : ""}
-            </span>
+            <span className="size-label">Size{size ? `: ${size}` : ""}</span>
             <button
               className="size-guide-btn"
               onClick={() =>
@@ -131,7 +199,7 @@ export default function Product() {
             </p>
           )}
 
-          <div className="pdp-actions">
+          <div className="pdp-actions" ref={actionsRef}>
             <button
               className="btn-solid full"
               disabled={!canAdd}
@@ -149,13 +217,13 @@ export default function Product() {
             </button>
           </div>
 
+          <ul className="pdp-assurances">
+            <li>Dispatched in 1–2 working days from Faisalabad</li>
+            <li>Exchanges within 7 days on unworn pieces</li>
+          </ul>
+
           <div className="accordion">
-            <Panel
-              id="details"
-              title="Details"
-              open={openPanel === "details"}
-              onToggle={setOpenPanel}
-            >
+            <Panel id="details" title="Details" open={openPanel === "details"} onToggle={setOpenPanel}>
               <p>{product.description}</p>
               {product.disclaimer && (
                 <p className="disclaimer">
@@ -164,62 +232,31 @@ export default function Product() {
               )}
             </Panel>
 
-            <Panel
-              id="sizing"
-              title="Size &amp; fit"
-              open={openPanel === "sizing"}
-              onToggle={setOpenPanel}
-            >
+            <Panel id="sizing" title="Size & fit" open={openPanel === "sizing"} onToggle={setOpenPanel}>
               <p>
                 Fits true to size with a relaxed drape. If you prefer a closer
                 fit, size down.
               </p>
               <table className="size-table">
                 <thead>
-                  <tr>
-                    <th>Size</th>
-                    <th>Chest (in)</th>
-                    <th>Length (in)</th>
-                  </tr>
+                  <tr><th>Size</th><th>Chest (in)</th><th>Length (in)</th></tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>S</td>
-                    <td>38–40</td>
-                    <td>27</td>
-                  </tr>
-                  <tr>
-                    <td>M</td>
-                    <td>40–42</td>
-                    <td>28</td>
-                  </tr>
-                  <tr>
-                    <td>L</td>
-                    <td>42–44</td>
-                    <td>29</td>
-                  </tr>
+                  <tr><td>S</td><td>38–40</td><td>27</td></tr>
+                  <tr><td>M</td><td>40–42</td><td>28</td></tr>
+                  <tr><td>L</td><td>42–44</td><td>29</td></tr>
                 </tbody>
               </table>
             </Panel>
 
-            <Panel
-              id="care"
-              title="Care"
-              open={openPanel === "care"}
-              onToggle={setOpenPanel}
-            >
+            <Panel id="care" title="Care" open={openPanel === "care"} onToggle={setOpenPanel}>
               <p>
                 Cold machine wash with like colours. Do not bleach. Dry flat in
                 shade to preserve the knit structure. Warm iron on reverse.
               </p>
             </Panel>
 
-            <Panel
-              id="shipping"
-              title="Shipping &amp; returns"
-              open={openPanel === "shipping"}
-              onToggle={setOpenPanel}
-            >
+            <Panel id="shipping" title="Shipping &amp; returns" open={openPanel === "shipping"} onToggle={setOpenPanel}>
               <p>
                 Dispatched within 1–2 working days from Faisalabad. Delivery
                 across Pakistan in 3–5 working days. Exchanges accepted within
@@ -245,6 +282,27 @@ export default function Product() {
           </div>
         </section>
       )}
+
+      {/* Sticky mobile buy bar */}
+      <div className={`buybar ${showBar ? "show" : ""}`}>
+        <div className="buybar-info">
+          <span className="buybar-title">{product.title}</span>
+          <span className="buybar-price">{formatPrice(product.price)}</span>
+        </div>
+        <button
+          className="btn-solid"
+          disabled={!canAdd}
+          onClick={() => {
+            if (canAdd) add(product, size);
+            else
+              document
+                .querySelector(".sizes")
+                ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        >
+          {!size ? "Select size" : !canAdd ? "Sold out" : "Add"}
+        </button>
+      </div>
     </>
   );
 }
