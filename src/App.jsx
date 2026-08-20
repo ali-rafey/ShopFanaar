@@ -9,11 +9,11 @@ import Home from "./pages/Home";
 import Collection from "./pages/Collection";
 import Product from "./pages/Product";
 import About from "./pages/About";
+import Saved from "./pages/Saved";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
   const { pathname } = useLocation();
-  const isHome = pathname === "/";
 
   // Meta Pixel PageView on every route change (incl. first load)
   useEffect(() => {
@@ -25,12 +25,13 @@ export default function App() {
       <ScrollToTop />
       <Header />
       <CartDrawer />
-      <main className={isHome ? "" : "page-offset"}>
+      <main className="page-offset">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/collections/:handle" element={<Collection />} />
           <Route path="/products/:handle" element={<Product />} />
           <Route path="/about" element={<About />} />
+          <Route path="/saved" element={<Saved />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

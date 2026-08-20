@@ -56,7 +56,7 @@ export default function CartDrawer() {
               <span>{formatPrice(subtotal)}</span>
             </div>
             <button
-              className="btn-dark"
+              className="btn-solid full"
               onClick={() => {
                 trackInitiateCheckout(items, subtotal);
                 alert(

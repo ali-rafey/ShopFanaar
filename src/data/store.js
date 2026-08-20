@@ -20,6 +20,66 @@ export const shop = {
 export const heroImage =
   "/images/hero.webp";
 
+// Category tiles for the "Shop by Category" board + mega-menu previews.
+export const categoryTiles = [
+  {
+    handle: "shirts",
+    title: "Shirts",
+    image: "/images/interlock-shirt-with-zip-closure-1.webp",
+  },
+  {
+    handle: "basics",
+    title: "Polo",
+    image: "/images/essential-pique-polo-green-1.webp",
+  },
+  {
+    handle: "quarter-zipper",
+    title: "Sweatshirts",
+    image: "/images/microgrid-quarter-zipper-1.webp",
+  },
+  {
+    handle: "t-shirts",
+    title: "T-Shirts",
+    image: "/images/yarn-dyed-stripe-tee-1.webp",
+  },
+  {
+    handle: "bottoms",
+    title: "Bottoms",
+    image: "/images/tropical-pant-4-1.webp",
+  },
+  {
+    handle: "frontpage",
+    title: "Drop Needle",
+    image: "/images/polo-1.webp",
+  },
+];
+
+// Editorial feature — "Autonomy by Fänaar" (fabrication story).
+export const craft = {
+  eyebrow: "Autonomy by Fänaar",
+  title: "Knitting & Weaving",
+  body: "Autonomy is where the garment begins — at the yarn. Drop needle ribs, micro-block textures and waffle thermals are engineered on the machine, not printed on the surface. The structure is the design.",
+  image: "/images/micro-block-drop-needle-knit-3.webp",
+  cta: { label: "Explore Autonomy", to: "/collections/frontpage" },
+};
+
+// Lookbook moodboard — a Pinterest-style mixed board.
+export const lookbook = [
+  "/images/microgrid-quarter-zipper-4.webp",
+  "/images/interlock-shirt-with-zip-closure-navy-3.webp",
+  "/images/tropical-pant-4-3.webp",
+  "/images/yarn-dyed-stripe-tee-3.webp",
+  "/images/interlock-shirt-with-zip-closure-4.webp",
+  "/images/micro-block-drop-needle-knit-4.webp",
+];
+
+// Small trust/values strip.
+export const values = [
+  { title: "Knit in Faisalabad", body: "Developed and finished in our own facility." },
+  { title: "Structured by design", body: "Texture engineered at the yarn, never printed." },
+  { title: "Considered quantities", body: "Small runs, restocked only when they earn it." },
+];
+
 // handle -> collection metadata
 export const collections = [
   { handle: "all-top", title: "All Top", group: "tops" },
@@ -261,4 +321,25 @@ export function getCollection(handle) {
 
 export function formatPrice(amount) {
   return `${shop.currencySymbol}${amount.toLocaleString("en-PK")}`;
+}
+
+// Products sharing a collection with the given one, excluding itself.
+export function getRelated(product, limit = 4) {
+  if (!product) return [];
+  const scored = products
+    .filter((p) => p.id !== product.id)
+    .map((p) => ({
+      p,
+      score: p.collections.filter((c) => product.collections.includes(c)).length,
+    }))
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.p);
+}
+
+export function getProductsByIds(ids = []) {
+  return ids.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+}
+
+export function totalStock(product) {
+  return product.sizes.reduce((n, s) => n + s.qty, 0);
 }

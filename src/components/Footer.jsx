@@ -5,17 +5,20 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="wrap footer-grid">
-        <div className="footer-connect">
-          <h4>Newsletter</h4>
-          <h3>let's connect like old friends</h3>
-          <form className="newsletter" onSubmit={(e) => e.preventDefault()}>
-            <input type="email" placeholder="Enter your email" />
-            <button type="submit">Subscribe</button>
-          </form>
-          <p style={{ marginTop: 22, fontSize: 12, color: "#666" }}>
+        <div className="footer-brand">
+          <img src={shop.logo} alt={shop.name} className="footer-logo" />
+          <p>
             {shop.origin}, by passionate individuals — sophisticated yet
             comfortable.
           </p>
+          <div className="footer-social">
+            <a href={shop.social.instagram} target="_blank" rel="noreferrer">
+              Instagram
+            </a>
+            <a href={shop.social.pinterest} target="_blank" rel="noreferrer">
+              Pinterest
+            </a>
+          </div>
         </div>
 
         <div>
@@ -31,18 +34,22 @@ export default function Footer() {
         </div>
 
         <div>
+          <h4>Autonomy</h4>
+          <ul>
+            <li><Link to="/collections/frontpage">Drop Needle</Link></li>
+            <li><Link to="/about">Knitting &amp; Weaving</Link></li>
+            <li><Link to="/about">About Us</Link></li>
+            <li><Link to="/saved">Saved</Link></li>
+          </ul>
+        </div>
+
+        <div>
           <h4>Information</h4>
           <ul>
-            <li><Link to="/about">About Us</Link></li>
-            <li><a href="#">Privacy Policy</a></li>
-            <li><a href="#">Refund Policy</a></li>
-            <li><a href="#">Shipping Policy</a></li>
-            <li><a href="#">Contact</a></li>
-          </ul>
-          <h4 style={{ marginTop: 26 }}>Follow</h4>
-          <ul>
-            <li><a href={shop.social.instagram} target="_blank" rel="noreferrer">Instagram</a></li>
-            <li><a href={shop.social.pinterest} target="_blank" rel="noreferrer">Pinterest</a></li>
+            <li><Link to="/about">Contact</Link></li>
+            <li><Link to="/about">Shipping</Link></li>
+            <li><Link to="/about">Returns</Link></li>
+            <li><Link to="/about">Privacy</Link></li>
           </ul>
         </div>
       </div>
