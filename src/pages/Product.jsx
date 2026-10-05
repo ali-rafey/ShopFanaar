@@ -1,22 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import {
-  getProduct,
-  getRelated,
-  getColorways,
-  formatPrice,
-  shop,
-  collections as allCollections,
-} from "../data/store";
+import { shop } from "../data/store";
+import { formatPrice } from "../lib/catalog";
+import { useCatalog } from "../context/CatalogContext";
 import { useCart } from "../context/CartContext";
 import { useSaved } from "../context/SavedContext";
 import { trackViewContent } from "../lib/pixel";
 import ProductCard, { Heart } from "../components/ProductCard";
 import Reveal from "../components/Reveal";
+import { ProductSkeleton } from "../components/Skeleton";
 
 export default function Product() {
   const { handle } = useParams();
-  const product = getProduct(handle);
+  const catalog = useCatalog();
+  const product = catalog.getProduct(handle);
   const { add } = useCart();
   const { isSaved, toggle } = useSaved();
 
@@ -46,9 +43,15 @@ export default function Product() {
     setShot(0);
     window.scrollTo(0, 0);
     if (galleryRef.current) galleryRef.current.scrollLeft = 0;
+  }, [handle]);
+
+  const productId = product?.id;
+  useEffect(() => {
     if (product) trackViewContent(product);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handle]);
+  }, [productId]);
+
+  if (!product && !catalog.ready) return <ProductSkeleton />;
 
   if (!product) {
     return (
@@ -67,11 +70,11 @@ export default function Product() {
   const selected = product.sizes.find((s) => s.size === size);
   const canAdd = selected && selected.qty > 0;
   const saved = isSaved(product.id);
-  const related = getRelated(product, 3);
-  const colorways = getColorways(product);
+  const related = catalog.getRelated(product, 3);
+  const colorways = catalog.getColorways(product);
 
   const primary = product.collections[0];
-  const crumb = allCollections.find((c) => c.handle === primary);
+  const crumb = catalog.collections.find((c) => c.handle === primary);
 
   // When colourways exist the swatches carry the colour, so the heading
   // drops the " - Colour" suffix instead of wrapping on the hyphen.
@@ -144,7 +147,12 @@ export default function Product() {
         <div className="pdp-info">
           <div className="vendor">{shop.name}</div>
           <h1>{heading}</h1>
-          <div className="pdp-price">{formatPrice(product.price)}</div>
+          <div className="pdp-price">
+            {product.compareAtPrice > product.price && (
+              <s className="was">{formatPrice(product.compareAtPrice)}</s>
+            )}
+            {formatPrice(product.price)}
+          </div>
 
           {colorways.length > 1 && (
             <div className="colorways">
@@ -261,6 +269,10 @@ export default function Product() {
                 Dispatched within 1–2 working days from Faisalabad. Delivery
                 across Pakistan in 3–5 working days. Exchanges accepted within
                 7 days of delivery on unworn pieces with tags intact.
+              </p>
+              <p>
+                <Link to="/policies/shipping-policy">Shipping policy</Link> ·{" "}
+                <Link to="/policies/refund-policy">Exchanges &amp; returns</Link>
               </p>
             </Panel>
           </div>

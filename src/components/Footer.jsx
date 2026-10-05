@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { shop } from "../data/store";
+import { shop, infoPages } from "../data/store";
+import SocialIcons from "./SocialIcons";
 
 export default function Footer() {
   return (
@@ -11,14 +12,7 @@ export default function Footer() {
             {shop.origin}, by passionate individuals — sophisticated yet
             comfortable.
           </p>
-          <div className="footer-social">
-            <a href={shop.social.instagram} target="_blank" rel="noreferrer">
-              Instagram
-            </a>
-            <a href={shop.social.pinterest} target="_blank" rel="noreferrer">
-              Pinterest
-            </a>
-          </div>
+          <SocialIcons className="footer-social" size={28} />
         </div>
 
         <div>
@@ -46,10 +40,11 @@ export default function Footer() {
         <div>
           <h4>Information</h4>
           <ul>
-            <li><Link to="/about">Contact</Link></li>
-            <li><Link to="/about">Shipping</Link></li>
-            <li><Link to="/about">Returns</Link></li>
-            <li><Link to="/about">Privacy</Link></li>
+            {infoPages.map((p) => (
+              <li key={p.to}>
+                <Link to={p.to}>{p.label}</Link>
+              </li>
+            ))}
           </ul>
         </div>
       </div>

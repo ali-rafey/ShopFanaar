@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import { useSaved } from "../context/SavedContext";
-import { getProductsByIds } from "../data/store";
+import { useCatalog } from "../context/CatalogContext";
 import ProductCard from "../components/ProductCard";
+import { GridSkeleton } from "../components/Skeleton";
 
 export default function Saved() {
   const { ids } = useSaved();
+  const { getProductsByIds, ready } = useCatalog();
   const items = getProductsByIds(ids);
 
   return (
@@ -17,7 +19,11 @@ export default function Saved() {
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {!ready && ids.length > 0 ? (
+        <div style={{ paddingBottom: 110 }}>
+          <GridSkeleton count={Math.min(ids.length, 6)} />
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p className="empty-lead">Your board is empty.</p>
           <p className="empty-sub">

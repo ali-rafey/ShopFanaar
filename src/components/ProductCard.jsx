@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { formatPrice, totalStock } from "../data/store";
+import { formatPrice, totalStock } from "../lib/catalog";
 import { useInView } from "../lib/useInView";
 import { useSaved } from "../context/SavedContext";
 
@@ -59,7 +59,12 @@ export default function ProductCard({ product, index = 0 }) {
 
       <div className="card-info">
         <p className="title">{product.title}</p>
-        <span className="price">{formatPrice(product.price)}</span>
+        <span className="price">
+          {product.compareAtPrice > product.price && (
+            <s className="was">{formatPrice(product.compareAtPrice)}</s>
+          )}
+          {formatPrice(product.price)}
+        </span>
       </div>
     </Link>
   );

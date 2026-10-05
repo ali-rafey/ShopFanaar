@@ -1,10 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { formatPrice } from "../data/store";
-import { trackInitiateCheckout } from "../lib/pixel";
+import { formatPrice } from "../lib/catalog";
 
 export default function CartDrawer() {
   const { items, open, setOpen, updateQty, remove, subtotal } = useCart();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -32,10 +32,22 @@ export default function CartDrawer() {
                 <div className="line-info">
                   <div className="t">{i.title}</div>
                   <div className="s">Size: {i.size}</div>
+                  {i.available === 0 && <div className="line-warn">Sold out</div>}
                   <div className="qty">
-                    <button onClick={() => updateQty(i.key, i.qty - 1)}>−</button>
+                    <button
+                      onClick={() => updateQty(i.key, i.qty - 1)}
+                      aria-label={`Decrease ${i.title} quantity`}
+                    >
+                      −
+                    </button>
                     <span>{i.qty}</span>
-                    <button onClick={() => updateQty(i.key, i.qty + 1)}>+</button>
+                    <button
+                      onClick={() => updateQty(i.key, i.qty + 1)}
+                      disabled={i.available != null && i.qty >= i.available}
+                      aria-label={`Increase ${i.title} quantity`}
+                    >
+                      +
+                    </button>
                   </div>
                   <div>
                     <button className="line-remove" onClick={() => remove(i.key)}>
@@ -58,16 +70,14 @@ export default function CartDrawer() {
             <button
               className="btn-solid full"
               onClick={() => {
-                trackInitiateCheckout(items, subtotal);
-                alert(
-                  "This is an independent demo store — checkout is not connected."
-                );
+                setOpen(false);
+                navigate("/checkout");
               }}
             >
               Checkout
             </button>
             <div className="drawer-note">
-              Taxes and shipping calculated at checkout.
+              Shipping calculated at checkout · Cash on delivery
             </div>
           </div>
         )}

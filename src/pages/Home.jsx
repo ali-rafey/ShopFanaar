@@ -2,16 +2,19 @@ import { Link } from "react-router-dom";
 import {
   heroImage,
   shop,
-  getCollection,
   categoryTiles,
   craft,
   lookbook,
   values,
 } from "../data/store";
+import { useCatalog } from "../context/CatalogContext";
 import ProductCard from "../components/ProductCard";
 import Reveal from "../components/Reveal";
+import { GridSkeleton } from "../components/Skeleton";
+import NewsletterForm from "../components/NewsletterForm";
 
 export default function Home() {
+  const { getCollection, ready } = useCatalog();
   const featured = getCollection("landing-page-collection").items;
   const dropNeedle = getCollection("frontpage").items;
 
@@ -82,11 +85,15 @@ export default function Home() {
             <Link to="/collections/landing-page-collection">View all</Link>
           </div>
         </Reveal>
-        <div className="grid">
-          {featured.slice(0, 6).map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
-        </div>
+        {ready ? (
+          <div className="grid">
+            {featured.slice(0, 6).map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+        ) : (
+          <GridSkeleton count={6} />
+        )}
       </section>
 
       {/* ---------- Craft / Autonomy editorial ---------- */}
@@ -116,11 +123,15 @@ export default function Home() {
             <Link to="/collections/frontpage">View all</Link>
           </div>
         </Reveal>
-        <div className="grid">
-          {dropNeedle.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
-        </div>
+        {ready ? (
+          <div className="grid">
+            {dropNeedle.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+        ) : (
+          <GridSkeleton count={3} />
+        )}
       </section>
 
       {/* ---------- Lookbook moodboard ---------- */}
@@ -150,15 +161,7 @@ export default function Home() {
               First access to restocks, new fabrications and everything we make
               in small numbers.
             </p>
-            <form className="join-form" onSubmit={(e) => e.preventDefault()}>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                aria-label="Email address"
-                required
-              />
-              <button type="submit">Subscribe</button>
-            </form>
+            <NewsletterForm />
           </div>
         </section>
       </Reveal>

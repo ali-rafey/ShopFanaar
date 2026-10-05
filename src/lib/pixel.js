@@ -1,9 +1,12 @@
 // Meta (Facebook) Pixel integration.
 //
 // The pixel ID is read from VITE_META_PIXEL_ID at build time, falling back to
-// the same pixel configured on the Shopify store (www.shopfanaar.com) so the
-// custom site reports into the same Meta dataset. Override it per-environment
-// by setting VITE_META_PIXEL_ID (see .env.example).
+// the pixel the old Shopify store used, so ad history stays in the same Meta
+// dataset. Override it per-environment with VITE_META_PIXEL_ID (.env.example).
+//
+// Events: PageView (every route), ViewContent (product page), AddToCart,
+// InitiateCheckout (checkout page), Purchase (order accepted, with an
+// eventID for de-duplication against a future Conversions API feed).
 export const PIXEL_ID =
   import.meta.env.VITE_META_PIXEL_ID || "1278679466701518";
 
@@ -47,9 +50,12 @@ export function initPixel() {
 }
 
 // Standard event wrapper — safe no-op if the pixel hasn't loaded.
-export function track(event, data) {
+// `eventID` lets Meta de-duplicate against a future server-side
+// (Conversions API) event for the same action.
+export function track(event, data, eventID) {
   if (typeof window !== "undefined" && window.fbq) {
-    window.fbq("track", event, data);
+    if (eventID) window.fbq("track", event, data, { eventID });
+    else window.fbq("track", event, data);
   }
 }
 
@@ -89,4 +95,32 @@ export function trackInitiateCheckout(items, subtotal) {
     value: subtotal,
     currency: CURRENCY,
   });
+}
+
+// Fired once, right after the order is accepted by the backend.
+export function trackPurchase(order) {
+  track(
+    "Purchase",
+    {
+      content_ids: order.items.map((i) => String(i.product_id)),
+      content_type: "product",
+      contents: order.items.map((i) => ({
+        id: String(i.product_id),
+        quantity: i.quantity,
+        item_price: i.unit_price,
+      })),
+      num_items: order.items.reduce((n, i) => n + i.quantity, 0),
+      value: order.total,
+      currency: CURRENCY,
+    },
+    `order-${order.id}`
+  );
+}
+
+export function trackLead() {
+  track("Lead", { content_name: "Newsletter" });
+}
+
+export function trackContact() {
+  track("Contact");
 }

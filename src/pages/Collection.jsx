@@ -1,7 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, Link, NavLink } from "react-router-dom";
-import { getCollection, categoryTiles, totalStock } from "../data/store";
+import { categoryTiles } from "../data/store";
+import { totalStock } from "../lib/catalog";
+import { useCatalog } from "../context/CatalogContext";
 import ProductCard from "../components/ProductCard";
+import { GridSkeleton } from "../components/Skeleton";
 
 const SORTS = [
   { key: "featured", label: "Featured" },
@@ -12,6 +15,7 @@ const SORTS = [
 
 export default function Collection() {
   const { handle } = useParams();
+  const { getCollection, ready } = useCatalog();
   const { meta, items } = getCollection(handle);
   const [sort, setSort] = useState("featured");
 
@@ -48,7 +52,7 @@ export default function Collection() {
         <span className="eyebrow">Fanaar</span>
         <h1>{meta ? meta.title : "Collection"}</h1>
         <div className="count">
-          {items.length} {items.length === 1 ? "piece" : "pieces"}
+          {ready ? `${items.length} ${items.length === 1 ? "piece" : "pieces"}` : "\u00a0"}
         </div>
       </div>
 
@@ -70,7 +74,11 @@ export default function Collection() {
         ))}
       </div>
 
-      {items.length === 0 ? (
+      {!ready ? (
+        <div style={{ paddingBottom: 110 }}>
+          <GridSkeleton count={6} />
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p className="empty-lead">Nothing here yet.</p>
           <p className="empty-sub">

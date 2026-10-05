@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { shop, categoryTiles, craft } from "../data/store";
 import { useCart } from "../context/CartContext";
 import { useSaved } from "../context/SavedContext";
+import SocialIcons from "./SocialIcons";
 
 const SHOP_LINKS = [
   { to: "/collections/all-top", label: "All Top" },
@@ -298,14 +299,7 @@ export default function Header() {
               Saved{savedCount > 0 ? ` (${savedCount})` : ""}
             </Link>
           </nav>
-          <div className="overlay-foot">
-            <a href={shop.social.instagram} target="_blank" rel="noreferrer">
-              Instagram
-            </a>
-            <a href={shop.social.pinterest} target="_blank" rel="noreferrer">
-              Pinterest
-            </a>
-          </div>
+          <SocialIcons className="overlay-foot" size={32} />
         </div>
       </div>
     </>

@@ -1,6 +1,10 @@
-// Catalog data copied from the Fanaar Shopify store (www.shopfanaar.com)
-// via the Shopify Admin connector. Images are self-hosted in /public/images.
-// This file makes the React store fully independent — no live API calls.
+// Site content + the original catalog.
+//
+// The live catalog (products, prices, stock, collections) is managed in the
+// admin at /admin and served from Supabase. The `products` / `collections`
+// below are the starting catalog: they seed the database
+// (scripts/generate-seed.mjs) and act as an offline fallback. Editorial
+// content (hero, tiles, lookbook, copy) is still edited here.
 
 export const shop = {
   name: "Fanaar",
@@ -11,10 +15,27 @@ export const shop = {
     "Fanaar draws inspiration from the deeper science of apparel — exploring how clothing interacts with the body and shapes the way we feel and live.",
   origin: "established from Faisalabad",
   social: {
-    instagram: "https://www.instagram.com/",
-    pinterest: "https://www.pinterest.com/",
+    instagram: "https://www.instagram.com/fanaarpakistan/",
+    pinterest: "https://www.pinterest.com/fanaarpakistan/",
+  },
+  // Shown on /pages/contact. Leave a value empty ("") to hide that line.
+  contact: {
+    email: "",
+    phone: "+44 7534 953387", // as displayed next to WhatsApp
+    whatsapp: "447534953387", // international digits for wa.me links
+    hours: "",
+    location: "Faisalabad, Pakistan",
   },
 };
+
+// Footer "Information" links + the tabs across the info pages. Paths match
+// the old Shopify URLs so existing links and search results keep working.
+export const infoPages = [
+  { to: "/pages/contact", label: "Contact" },
+  { to: "/policies/shipping-policy", label: "Shipping" },
+  { to: "/policies/refund-policy", label: "Returns" },
+  { to: "/policies/privacy-policy", label: "Privacy" },
+];
 
 // Primary hero — the black & white portrait from the live store.
 export const heroImage =
@@ -308,50 +329,3 @@ export const products = [
     collections: ["bottoms"],
   },
 ];
-
-export function getProduct(handle) {
-  return products.find((p) => p.handle === handle);
-}
-
-export function getCollection(handle) {
-  const meta = collections.find((c) => c.handle === handle);
-  const items = products.filter((p) => p.collections.includes(handle));
-  return { meta, items };
-}
-
-export function formatPrice(amount) {
-  return `${shop.currencySymbol}${amount.toLocaleString("en-PK")}`;
-}
-
-// Products sharing a collection with the given one, excluding itself.
-export function getRelated(product, limit = 4) {
-  if (!product) return [];
-  const scored = products
-    .filter((p) => p.id !== product.id)
-    .map((p) => ({
-      p,
-      score: p.collections.filter((c) => product.collections.includes(c)).length,
-    }))
-    .sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.p);
-}
-
-export function getProductsByIds(ids = []) {
-  return ids.map((id) => products.find((p) => p.id === id)).filter(Boolean);
-}
-
-export function totalStock(product) {
-  return product.sizes.reduce((n, s) => n + s.qty, 0);
-}
-
-// Sibling colourways: titles formatted "Base Name - Colour" group together.
-export function getColorways(product) {
-  if (!product || !product.title.includes(" - ")) return [];
-  const base = product.title.split(" - ")[0].trim();
-  return products
-    .filter((p) => p.title.startsWith(base + " - "))
-    .map((p) => ({
-      ...p,
-      colorName: p.title.split(" - ").slice(1).join(" - ").trim(),
-    }));
-}
