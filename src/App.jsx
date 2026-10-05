@@ -38,11 +38,12 @@ export default function App() {
 function Storefront() {
   const { pathname } = useLocation();
 
-  // Meta Pixel PageView on every route change (incl. first load). Loaded
-  // here rather than globally so admin sessions never report to Meta.
+  // Meta Pixel PageView on every route change (the landing one is sent from
+  // main.jsx; repeats for the same path are ignored). initPixel is a no-op
+  // when already loaded — it only matters after arriving from /admin.
   useEffect(() => {
     initPixel();
-    trackPageView();
+    trackPageView(pathname);
   }, [pathname]);
 
   return (

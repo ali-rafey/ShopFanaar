@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { trackAddToWishlist } from "../lib/pixel";
 
 const SavedContext = createContext(null);
 const STORAGE_KEY = "fanaar-saved";
@@ -17,7 +18,9 @@ export function SavedProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
   }, [ids]);
 
-  function toggle(id) {
+  // Pass the product to report a save to Meta (AddToWishlist).
+  function toggle(id, product) {
+    if (product && !ids.includes(id)) trackAddToWishlist(product);
     setIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev]
     );

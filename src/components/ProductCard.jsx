@@ -47,7 +47,7 @@ export default function ProductCard({ product, index = 0 }) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            toggle(product.id);
+            toggle(product.id, product);
           }}
         >
           <Heart filled={saved} />

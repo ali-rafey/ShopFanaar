@@ -47,7 +47,11 @@ export function CartProvider({ children }) {
   function add(product, size, qty = 1) {
     const key = `${product.id}-${size}`;
     const stock = product.sizes.find((s) => s.size === size)?.qty;
-    trackAddToCart(product, size, qty);
+    const current = items.find((i) => i.key === key)?.qty || 0;
+    const added = cap(current + qty, stock) - current;
+    setOpen(true);
+    if (added <= 0) return; // already holding every unit in stock
+    trackAddToCart(product, size, added);
     setItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
@@ -69,7 +73,6 @@ export function CartProvider({ children }) {
         },
       ];
     });
-    setOpen(true);
   }
 
   function updateQty(key, qty) {

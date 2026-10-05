@@ -217,7 +217,7 @@ export default function Product() {
             </button>
             <button
               className={`btn-outline save ${saved ? "is-saved" : ""}`}
-              onClick={() => toggle(product.id)}
+              onClick={() => toggle(product.id, product)}
               aria-pressed={saved}
             >
               <Heart filled={saved} />

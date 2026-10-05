@@ -5,8 +5,13 @@
 // dataset. Override it per-environment with VITE_META_PIXEL_ID (.env.example).
 //
 // Events: PageView (every route), ViewContent (product page), AddToCart,
-// InitiateCheckout (checkout page), Purchase (order accepted, with an
-// eventID for de-duplication against a future Conversions API feed).
+// AddToWishlist (Save), InitiateCheckout (checkout page), Purchase (order
+// accepted, with an eventID for de-duplication against a future Conversions
+// API feed), Lead (newsletter), Contact (contact form).
+//
+// The pixel starts in main.jsx before React renders, so events fired from a
+// page's first effects (e.g. ViewContent on a product landing) are never
+// lost. It is never loaded on /admin.
 export const PIXEL_ID =
   import.meta.env.VITE_META_PIXEL_ID || "1278679466701518";
 
@@ -53,7 +58,17 @@ export function initPixel() {
 // `eventID` lets Meta de-duplicate against a future server-side
 // (Conversions API) event for the same action.
 export function track(event, data, eventID) {
-  if (typeof window !== "undefined" && window.fbq) {
+  if (typeof window === "undefined") return;
+  // A page's own events (ViewContent, InitiateCheckout…) run before the
+  // route-change PageView effect; send that page's PageView first so Meta
+  // always sees PageView → event. Never doubles: one PageView per path.
+  if (event !== "PageView") trackPageView();
+  // Dev builds keep a log (window.__pixelLog) — Meta blocks this pixel on
+  // localhost, so this is how events are checked locally.
+  if (import.meta.env.DEV) {
+    (window.__pixelLog ||= []).push({ event, data, eventID, path: window.location.pathname, fbq: Boolean(window.fbq) });
+  }
+  if (window.fbq) {
     if (eventID) window.fbq("track", event, data, { eventID });
     else window.fbq("track", event, data);
   }
@@ -61,7 +76,14 @@ export function track(event, data, eventID) {
 
 // ---- Convenience helpers for the storefront's key events ----
 
-export function trackPageView() {
+const unique = (ids) => [...new Set(ids.map(String))];
+let lastPageView = null;
+
+// Once per path: the first call happens at boot (main.jsx), later ones on
+// route changes — repeated calls for the same path are ignored.
+export function trackPageView(path = window.location.pathname) {
+  if (path === lastPageView) return;
+  lastPageView = path;
   track("PageView");
 }
 
@@ -70,6 +92,7 @@ export function trackViewContent(product) {
     content_ids: [String(product.id)],
     content_name: product.title,
     content_type: "product",
+    contents: [{ id: String(product.id), quantity: 1, item_price: product.price }],
     value: product.price,
     currency: CURRENCY,
   });
@@ -80,17 +103,28 @@ export function trackAddToCart(product, size, qty = 1) {
     content_ids: [String(product.id)],
     content_name: product.title,
     content_type: "product",
-    contents: [{ id: String(product.id), quantity: qty, variant: size }],
+    contents: [{ id: String(product.id), quantity: qty, item_price: product.price, variant: size }],
     value: product.price * qty,
+    currency: CURRENCY,
+  });
+}
+
+export function trackAddToWishlist(product) {
+  track("AddToWishlist", {
+    content_ids: [String(product.id)],
+    content_name: product.title,
+    content_type: "product",
+    contents: [{ id: String(product.id), quantity: 1, item_price: product.price }],
+    value: product.price,
     currency: CURRENCY,
   });
 }
 
 export function trackInitiateCheckout(items, subtotal) {
   track("InitiateCheckout", {
-    content_ids: items.map((i) => String(i.id)),
+    content_ids: unique(items.map((i) => i.id)),
     content_type: "product",
-    contents: items.map((i) => ({ id: String(i.id), quantity: i.qty })),
+    contents: items.map((i) => ({ id: String(i.id), quantity: i.qty, item_price: i.price })),
     num_items: items.reduce((n, i) => n + i.qty, 0),
     value: subtotal,
     currency: CURRENCY,
@@ -102,7 +136,7 @@ export function trackPurchase(order) {
   track(
     "Purchase",
     {
-      content_ids: order.items.map((i) => String(i.product_id)),
+      content_ids: unique(order.items.map((i) => i.product_id)),
       content_type: "product",
       contents: order.items.map((i) => ({
         id: String(i.product_id),
