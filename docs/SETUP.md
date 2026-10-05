@@ -109,3 +109,26 @@ auto-detects Vite (`npm run build`, output `dist`).
 - **Fonts:** Bodoni Moda + Inter, self-hosted in `public/fonts`.
 - **Meta Pixel:** `src/lib/pixel.js` — PageView, ViewContent, AddToCart,
   InitiateCheckout, Purchase. Not loaded on admin pages.
+
+## Order notifications (phone)
+
+Every new order sends a push notification ("Fanaar has a new order for 2
+items totaling Rs.5,050 from Online Store.") to each admin device that turned
+them on. Tapping it opens the order.
+
+How it works: a deferred trigger on `orders` (`private.notify_new_order`)
+calls `/api/notify-order` through `pg_net` once the order is committed; that
+Vercel function signs and sends the Web Push. Failures never block an order.
+
+- **Vercel env (type "Secret"):** `VAPID_PRIVATE_KEY`, `NOTIFY_SECRET`.
+  The matching public key is in `src/lib/vapid.js`; the same `NOTIFY_SECRET`
+  is stored in the database in `private.notify_config` (with the function URL).
+- **iPhone:** Safari → Share → Add to Home Screen, open Fanaar from the Home
+  Screen, sign in, Settings → *Turn on notifications on this device*.
+- **Android / desktop:** open `/admin` in Chrome → Settings → turn on.
+- *Send test notification* in Settings checks the whole chain and explains
+  any setup problem.
+- Sound: phones use their notification sound (Android lets you choose one per
+  app). An open admin window plays its own chime — replace it by putting a
+  file in `public/sounds/` and setting `ORDER_SOUND_URL` in
+  `src/admin/sound.js`.

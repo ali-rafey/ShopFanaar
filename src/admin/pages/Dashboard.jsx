@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
+import { useEffect, useState } from "react";
 import { compactMoney, money, PageHead, StatusBadge, timeAgo, useLoad, ErrorBox, Spinner } from "../ui";
+import { currentSubscription, pushEnvironment } from "../push";
 
 export default function Dashboard() {
   const { stats, version } = useFeed();
@@ -9,6 +11,14 @@ export default function Dashboard() {
     () => Promise.all(["pending", "confirmed", "packed"].map((status) => api.listOrders({ status, limit: 8 }))),
     [version]
   );
+
+  // Nudge towards phone notifications until this device has them.
+  const [nudge, setNudge] = useState(false);
+  useEffect(() => {
+    const env = pushEnvironment();
+    if (api.BACKEND !== "supabase" || !(env.supported || env.needsInstall)) return;
+    currentSubscription().then((s) => setNudge(!s), () => {});
+  }, []);
 
   if (!stats) return <Spinner />;
   const by = stats.by_status || {};
@@ -19,6 +29,17 @@ export default function Dashboard() {
   return (
     <>
       <PageHead title="Overview" sub="What needs doing today, and how the store is selling." />
+
+      {nudge && (
+        <Link to="/admin/settings#notifications" className="adm-nudge">
+          <img src="/icons/app-192.png" alt="" />
+          <span>
+            <strong>Get a notification for every order</strong>
+            Turn on order notifications for this phone or computer.
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
 
       <section className="adm-tiles" aria-label="Key numbers">
         <Tile label="Orders to confirm" value={by.pending || 0} to="/admin/orders?status=pending" />

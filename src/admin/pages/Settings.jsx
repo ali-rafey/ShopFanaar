@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../api";
 import { ConfirmButton, ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
+import NotificationsCard from "../NotificationsCard";
 
 export default function Settings() {
   const toast = useToast();
@@ -43,7 +44,9 @@ export default function Settings() {
 
   return (
     <>
-      <PageHead title="Settings" sub="Checkout rules. Changes apply to the store immediately." />
+      <PageHead title="Settings" sub="Order notifications and checkout rules." />
+
+      <NotificationsCard />
 
       <form className="adm-card adm-narrow" onSubmit={save}>
         <h2>Checkout</h2>

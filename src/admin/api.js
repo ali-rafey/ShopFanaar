@@ -291,6 +291,42 @@ export async function deleteSubscriber(id) {
   unwrap(await sb.from("subscribers").delete().eq("id", id));
 }
 
+// ---------------------------------------------------- order notifications
+
+export async function savePushDevice(subscription, device) {
+  if (!sb) throw new ApiError("Notifications need the live database (not available in demo mode).");
+  const { endpoint, keys } = subscription.toJSON();
+  unwrap(
+    await sb
+      .from("push_subscriptions")
+      .upsert({ endpoint, p256dh: keys.p256dh, auth: keys.auth, device }, { onConflict: "endpoint" })
+  );
+}
+
+export async function removePushDevice(endpoint) {
+  if (!sb || !endpoint) return;
+  unwrap(await sb.from("push_subscriptions").delete().eq("endpoint", endpoint));
+}
+
+export async function listPushDevices() {
+  if (!sb) return [];
+  return unwrap(
+    await sb.from("push_subscriptions").select("id,endpoint,device,created_at").order("created_at")
+  );
+}
+
+// Sends a sample notification to this admin's devices and waits briefly for
+// the push function's answer, so setup problems show up in the admin.
+export async function sendTestPush() {
+  const id = unwrap(await sb.rpc("send_test_push"));
+  for (let i = 0; i < 8; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const result = unwrap(await sb.rpc("push_test_result", { p_id: id }));
+    if (result) return result;
+  }
+  return { status: null, body: "" };
+}
+
 // --------------------------------------------------------------- settings
 
 export async function getSettings() {

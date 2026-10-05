@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Navigate, NavLink, Outlet, Route, Routes, useLocation, Link } from "react-router-dom";
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, Link } from "react-router-dom";
 import * as api from "./api";
 import { ToastProvider, Spinner, useToast } from "./ui";
+import { registerWorker, setBadge } from "./push";
+import { playOrderSound } from "./sound";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -72,6 +74,7 @@ function FeedProvider({ children }) {
       if (payload?.eventType === "INSERT" && o && !seen.current.has(o.id)) {
         seen.current.add(o.id);
         toast(`New order #${o.order_number} — ${o.customer_name}`, "new");
+        playOrderSound();
       }
     });
   }, [refreshStats, toast]);
@@ -79,7 +82,23 @@ function FeedProvider({ children }) {
   const pending = stats?.by_status?.pending || 0;
   useEffect(() => {
     document.title = `${pending ? `(${pending}) ` : ""}Fanaar Admin`;
-  }, [pending]);
+    if (stats) setBadge(pending); // home-screen icon badge when installed
+  }, [pending, stats]);
+
+  // Service worker: keeps notifications working and opens the tapped order.
+  const navigate = useNavigate();
+  useEffect(() => {
+    registerWorker();
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (e) => {
+      if (e.data?.type === "open" && e.data.url) {
+        const u = new URL(e.data.url, window.location.origin);
+        navigate(u.pathname + u.search);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [navigate]);
 
   return (
     <FeedContext.Provider value={{ stats, refreshStats, version }}>{children}</FeedContext.Provider>
