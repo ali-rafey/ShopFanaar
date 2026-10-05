@@ -173,7 +173,7 @@ export async function placeOrder(payload) {
       items: lines.map(({ v, ...l }) => l),
     };
   });
-  listeners.forEach((fn) => fn({ eventType: "INSERT", new: { id: result.id, order_number: result.order_number, customer_name: payload.customer.name } }));
+  listeners.forEach((fn) => fn({ eventType: "INSERT", new: { id: result.id, order_number: result.order_number, customer_name: payload.customer.name, total: result.total } }));
   return result;
 }
 

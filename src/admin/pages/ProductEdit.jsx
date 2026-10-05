@@ -218,7 +218,7 @@ export default function ProductEdit() {
   return (
     <div className="adm-editor">
       <PageHead
-        back={<Link to="/admin/products" className="adm-back">← Products</Link>}
+        back={<Link to="/admin/products" className="adm-back">Products</Link>}
         title={isNew ? "New product" : original.title}
         actions={
           !isNew &&

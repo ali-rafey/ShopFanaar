@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ALL_STATUSES, STATUS } from "../../lib/orderStatus";
-import { ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner, StatusBadge, useLoad } from "../ui";
+import { ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner, StatusBadge, timeAgo, useLoad } from "../ui";
 
 const PAGE = 50;
 
@@ -84,7 +84,32 @@ export default function Orders() {
           {q || status ? "No orders match this filter." : "No orders yet. They'll show up here the moment someone checks out."}
         </p>
       ) : (
-        <div className="adm-card flush">
+        <>
+        <ul className="adm-cells adm-only-mobile">
+          {rows.map((o) => {
+            const units = o.order_items.reduce((n, i) => n + i.quantity, 0);
+            return (
+              <li key={o.id}>
+                <Link to={`/admin/orders/${o.id}`} className="adm-cell">
+                  <span className="adm-cell-main">
+                    <span className="adm-cell-title">
+                      <strong>#{o.order_number}</strong> {o.customer_name}
+                    </span>
+                    <span className="adm-cell-sub">
+                      {o.city} · {units} {units === 1 ? "item" : "items"} · {timeAgo(o.created_at)}
+                    </span>
+                  </span>
+                  <span className="adm-cell-side">
+                    <span className="adm-cell-amount">{money(o.total)}</span>
+                    <StatusBadge status={o.status} />
+                  </span>
+                  <span className="adm-chevron" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="adm-card flush adm-only-desktop">
           <table className="adm-table adm-orders">
             <thead>
               <tr>
@@ -123,6 +148,7 @@ export default function Orders() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {list.data && list.data.count > rows.length && (

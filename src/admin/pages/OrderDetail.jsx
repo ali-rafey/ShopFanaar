@@ -53,14 +53,14 @@ export default function OrderDetail() {
   return (
     <>
       <PageHead
-        back={<Link to="/admin/orders" className="adm-back">← Orders</Link>}
+        back={<Link to="/admin/orders" className="adm-back">Orders</Link>}
         title={`Order #${o.order_number}`}
         sub={`Placed ${fmtDate(o.created_at)} · ${timeAgo(o.created_at)} · ${units} ${units === 1 ? "item" : "items"}`}
         actions={
           <>
             <StatusBadge status={o.status} />
             <PayBadge status={o.payment_status} />
-            <button className="adm-btn" onClick={() => window.print()}>
+            <button className="adm-btn adm-print-btn" onClick={() => window.print()}>
               Print slip
             </button>
           </>
@@ -423,7 +423,7 @@ function Timeline({ order, events, busy, act }) {
     <section className="adm-card">
       <h2>Timeline</h2>
       <form
-        className="adm-status-row"
+        className="adm-status-row adm-inline-form"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!note.trim()) return;

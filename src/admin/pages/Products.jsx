@@ -70,7 +70,38 @@ export default function Products() {
       ) : rows.length === 0 ? (
         <p className="adm-empty">{all.length ? "No products match." : "No products yet."}</p>
       ) : (
-        <div className="adm-card flush">
+        <>
+        <ul className="adm-cells adm-only-mobile">
+          {rows.map((p) => {
+            const stock = totalStock(p);
+            return (
+              <li key={p.id}>
+                <Link to={`/admin/products/${p.id}`} className="adm-cell">
+                  <span className="adm-thumb">{p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}</span>
+                  <span className="adm-cell-main">
+                    <span className="adm-cell-title">{p.title}</span>
+                    <span className="adm-cell-sub">
+                      {money(p.price)} ·{" "}
+                      <span className={stock === 0 ? "adm-out" : ""}>
+                        {stock === 0 ? "Sold out" : `${stock} in stock`}
+                      </span>
+                    </span>
+                    <span className="adm-sizes">
+                      {p.sizes.map((s) => (
+                        <span key={s.size} className={s.qty === 0 ? "out" : s.qty <= 3 ? "low" : ""}>
+                          {s.size} <b>{s.qty}</b>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                  {p.status !== "active" && <ProductStatusBadge status={p.status} />}
+                  <span className="adm-chevron" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="adm-card flush adm-only-desktop">
           <table className="adm-table adm-products">
             <thead>
               <tr>
@@ -115,6 +146,7 @@ export default function Products() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </>
   );

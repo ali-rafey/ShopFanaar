@@ -92,16 +92,22 @@ export default function NotificationsCard() {
       <h2>Order notifications</h2>
       <p className="adm-sub">A notification on your phone the moment an order is placed. Tap it to open the order.</p>
 
-      <div className="adm-notif-preview" aria-hidden="true">
-        <img src="/icons/app-192.png" alt="" />
-        <div>
-          <div className="adm-notif-top">
-            <strong>Fanaar</strong>
-            <span>now</span>
+      <div className="adm-notif-stage" aria-hidden="true">
+        <div className="adm-notif-preview">
+          <img src="/icons/app-192.png" alt="" />
+          <div>
+            <div className="adm-notif-top">
+              <strong>New order #1001</strong>
+              <span>now</span>
+            </div>
+            <strong className="adm-notif-from">from Fanaar</strong>
+            <p>1 item totaling Rs.2,400 from Online Store.</p>
           </div>
-          <p>Fanaar has a new order for 1 item totaling Rs.2,400 from Online Store.</p>
         </div>
       </div>
+      <p className="adm-hint">
+        iPhone always adds the “from Fanaar” line to web-app notifications, so the order is the title.
+      </p>
 
       {!live ? (
         <p className="adm-hint">Available once the store is connected to Supabase (not in demo mode).</p>
@@ -200,7 +206,8 @@ export default function NotificationsCard() {
       </label>
       {env.ios ? (
         <p className="adm-hint">
-          On iPhone the notification uses your phone&apos;s standard notification sound.
+          On iPhone, notifications play your Default Alert sound — set it to the Fanaar tone in
+          Settings → Sounds &amp; Haptics → Default Alerts.
         </p>
       ) : /Android/.test(navigator.userAgent) ? (
         <p className="adm-hint">

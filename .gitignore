@@ -36,3 +36,6 @@ pnpm-debug.log*
 # supabase cli
 supabase/.temp
 supabase/.branches
+
+# source audio dropped in by hand (served copy lives in public/sounds)
+/sound/

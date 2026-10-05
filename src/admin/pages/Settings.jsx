@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import * as api from "../api";
 import { ConfirmButton, ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
 import NotificationsCard from "../NotificationsCard";
+import { useAuth } from "../AdminApp";
 
 export default function Settings() {
   const toast = useToast();
+  const { user, signOut } = useAuth();
   const res = useLoad(() => api.getSettings(), []);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -90,6 +92,19 @@ export default function Settings() {
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <section className="adm-card adm-narrow adm-only-mobile">
+        <h2>Account</h2>
+        <p className="adm-sub" style={{ marginBottom: 14 }}>{user?.email}</p>
+        <div className="adm-btns">
+          <a className="adm-btn" href="/" target="_blank" rel="noreferrer">
+            View store ↗
+          </a>
+          <button className="adm-btn" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
+      </section>
 
       {api.BACKEND === "demo" && (
         <section className="adm-card adm-narrow">

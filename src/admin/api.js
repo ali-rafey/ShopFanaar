@@ -112,6 +112,15 @@ export async function getOrder(id) {
   return o ? { order: o, items: unwrap(items), events: unwrap(events) } : null;
 }
 
+export async function orderItemCount(orderId) {
+  if (!sb) {
+    const o = await (await demo()).getOrder(orderId);
+    return o ? o.items.reduce((n, i) => n + i.quantity, 0) : null;
+  }
+  const rows = unwrap(await sb.from("order_items").select("quantity").eq("order_id", orderId));
+  return rows.reduce((n, i) => n + i.quantity, 0);
+}
+
 export async function setOrderStatus(id, status, note, restock = true) {
   if (!sb) return (await demo()).setOrderStatus(id, status, note, restock);
   return unwrap(

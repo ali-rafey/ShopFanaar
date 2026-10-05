@@ -53,7 +53,7 @@ export function ProductStatusBadge({ status }) {
 
 export function PageHead({ title, sub, actions, back }) {
   return (
-    <header className="adm-pagehead">
+    <header className={`adm-pagehead ${back ? "has-back" : ""}`}>
       <div>
         {back}
         <h1>{title}</h1>

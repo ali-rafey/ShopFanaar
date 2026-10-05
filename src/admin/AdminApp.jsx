@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, Link } from "react-router-dom";
 import * as api from "./api";
-import { ToastProvider, Spinner, useToast } from "./ui";
+import { ToastProvider, Spinner, money } from "./ui";
 import { registerWorker, setBadge } from "./push";
-import { playOrderSound } from "./sound";
+import { playOrderSound, unlockAudioOnFirstTap } from "./sound";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -58,8 +58,9 @@ const FeedContext = createContext(null);
 export const useFeed = () => useContext(FeedContext);
 
 function FeedProvider({ children }) {
-  const toast = useToast();
   const [stats, setStats] = useState(null);
+  const [banner, setBanner] = useState(null); // in-app "new order" alert
+  const closeBanner = useCallback(() => setBanner(null), []);
   const [version, setVersion] = useState(0); // bumps on any order change
   const seen = useRef(new Set());
 
@@ -73,11 +74,14 @@ function FeedProvider({ children }) {
       const o = payload?.new;
       if (payload?.eventType === "INSERT" && o && !seen.current.has(o.id)) {
         seen.current.add(o.id);
-        toast(`New order #${o.order_number} — ${o.customer_name}`, "new");
         playOrderSound();
+        api
+          .orderItemCount(o.id)
+          .catch(() => null)
+          .then((items) => setBanner({ ...o, items, at: Date.now() }));
       }
     });
-  }, [refreshStats, toast]);
+  }, [refreshStats]);
 
   const pending = stats?.by_status?.pending || 0;
   useEffect(() => {
@@ -87,6 +91,7 @@ function FeedProvider({ children }) {
 
   // Service worker: keeps notifications working and opens the tapped order.
   const navigate = useNavigate();
+  useEffect(() => unlockAudioOnFirstTap(), []);
   useEffect(() => {
     registerWorker();
     if (!("serviceWorker" in navigator)) return;
@@ -101,15 +106,58 @@ function FeedProvider({ children }) {
   }, [navigate]);
 
   return (
-    <FeedContext.Provider value={{ stats, refreshStats, version }}>{children}</FeedContext.Provider>
+    <FeedContext.Provider value={{ stats, refreshStats, version }}>
+      {children}
+      {banner && (
+        <OrderBanner
+          key={banner.at}
+          order={banner}
+          onOpen={() => {
+            setBanner(null);
+            navigate(`/admin/orders/${banner.id}`);
+          }}
+          onClose={closeBanner}
+        />
+      )}
+    </FeedContext.Provider>
+  );
+}
+
+// iPhone-style notification banner shown inside the admin for a new order.
+function OrderBanner({ order, onOpen, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 8000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+  const n = order.items;
+  const text =
+    n != null
+      ? `Fanaar has a new order for ${n} ${n === 1 ? "item" : "items"} totaling ${money(order.total)} from Online Store.`
+      : `Fanaar has a new order totaling ${money(order.total)} from Online Store.`;
+  return (
+    <div className="adm-banner-wrap" role="alert">
+      <button type="button" className="adm-banner" onClick={onOpen}>
+        <img src="/icons/app-192.png" alt="" />
+        <span className="adm-banner-text">
+          <span className="adm-banner-top">
+            <strong>Fanaar</strong>
+            <span>now</span>
+          </span>
+          <span>{text}</span>
+        </span>
+      </button>
+      <button type="button" className="adm-banner-close" onClick={onClose} aria-label="Dismiss">
+        ×
+      </button>
+    </div>
   );
 }
 
 // ----------------------------------------------------------------- layout
 
-function Icon({ d }) {
+function Icon({ d, size = 18 }) {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
       <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -126,13 +174,16 @@ const NAV = [
 function Layout() {
   const { user, signOut } = useAuth();
   const { stats } = useFeed();
+  const { pathname } = useLocation();
   const badges = {
     pending: stats?.by_status?.pending || 0,
     unread: stats?.unread_messages || 0,
   };
+  // Detail screens hide the tab bar on phones, like a native app's pushed view.
+  const detail = /^\/admin\/(orders|products)\/[^/]+/.test(pathname);
 
   return (
-    <div className="adm-shell">
+    <div className={`adm-shell ${detail ? "is-detail" : ""}`}>
       <aside className="adm-side">
         <Link to="/admin" className="adm-brand">
           <img src="/logo.png" alt="" />
@@ -173,6 +224,17 @@ function Layout() {
         )}
         <Outlet />
       </main>
+      <nav className="adm-tabbar" aria-label="Admin">
+        {NAV.map((n) => (
+          <NavLink key={n.to} to={n.to} end={n.end} className="adm-tab">
+            <span className="adm-tab-icon">
+              <Icon d={n.icon} size={24} />
+              {n.badge && badges[n.badge] > 0 && <span className="adm-tab-badge">{badges[n.badge]}</span>}
+            </span>
+            <span>{n.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -223,6 +285,13 @@ function NotConfigured() {
 // ------------------------------------------------------------------- app
 
 export default function AdminApp() {
+  // Arriving here by in-app navigation from the storefront leaves the
+  // storefront's page head in place; reload so admin.html (with the app
+  // manifest + icon iPhone needs for "Add to Home Screen") is in charge.
+  useEffect(() => {
+    if (!document.querySelector('link[rel="manifest"]')) window.location.replace(window.location.href);
+  }, []);
+
   // Keep the admin out of search engines.
   useEffect(() => {
     const meta = document.createElement("meta");

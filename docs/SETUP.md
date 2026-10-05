@@ -128,7 +128,9 @@ Vercel function signs and sends the Web Push. Failures never block an order.
 - **Android / desktop:** open `/admin` in Chrome → Settings → turn on.
 - *Send test notification* in Settings checks the whole chain and explains
   any setup problem.
-- Sound: phones use their notification sound (Android lets you choose one per
-  app). An open admin window plays its own chime — replace it by putting a
-  file in `public/sounds/` and setting `ORDER_SOUND_URL` in
-  `src/admin/sound.js`.
+- Sound: `public/sounds/new-order.mp3` plays in an open admin window
+  (`src/admin/sound.js`). iPhone web-app notifications always use the phone's
+  Default Alert sound, so the same file is installed on the owner's iPhone as
+  a tone (`.m4r`, made with `afconvert in.mp3 out.m4r -f m4af -d aac`) and
+  chosen under Settings → Sounds & Haptics → Default Alerts. Android lets you
+  pick a sound per app.

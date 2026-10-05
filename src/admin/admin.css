@@ -13,9 +13,13 @@
   --a-radius: 12px;
   background: var(--a-bg);
   color: var(--a-ink);
+  /* The phone's own UI font — the admin should feel like a native app. */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Arial,
+    sans-serif;
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .adm-body code {
@@ -610,7 +614,7 @@ textarea.adm-input {
   color: var(--a-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  margin-left: 2px;
+  margin-left: 5px;
 }
 .adm-tabs button.on {
   color: var(--a-ink);
@@ -1128,6 +1132,21 @@ textarea.adm-input {
 }
 
 /* ------------------------------------------------------------ responsive */
+.adm-back::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-left: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor;
+  transform: rotate(45deg);
+  margin: 0 7px 1px 2px;
+}
+.adm-tabbar,
+.adm-only-mobile {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .adm-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1138,126 +1157,398 @@ textarea.adm-input {
   }
 }
 
+/* ===== Phone: native-app layout (bottom tab bar, sticky headers, cells) ===== */
 @media (max-width: 860px) {
+  .adm-only-mobile {
+    display: block;
+  }
+  .adm-only-desktop {
+    display: none !important;
+  }
+
+  .adm-body {
+    font-size: 15px;
+  }
   .adm-shell {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    display: block;
+    min-height: 100dvh;
   }
   .adm-side {
+    display: none;
+  }
+  .adm-main {
+    max-width: none;
+    padding: 0 16px calc(100px + env(safe-area-inset-bottom));
+  }
+  .adm-shell.is-detail .adm-main {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  }
+
+  /* Bottom tab bar */
+  .adm-tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    padding: 6px 4px calc(4px + env(safe-area-inset-bottom));
+    background: rgba(249, 249, 247, 0.84);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-top: 0.5px solid rgba(0, 0, 0, 0.14);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .adm-shell.is-detail .adm-tabbar {
+    display: none;
+  }
+  .adm-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 50px;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: #8e8e93;
+  }
+  .adm-tab.active {
+    color: var(--a-ink);
+  }
+  .adm-tab-icon {
+    position: relative;
+    display: inline-flex;
+  }
+  .adm-tab-badge {
+    position: absolute;
+    top: -5px;
+    left: 15px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ff3b30;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  /* Page headers: large title on lists, sticky blurred bar on detail screens */
+  .adm-pagehead {
+    margin: 0 0 14px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    align-items: center;
+    gap: 6px 12px;
+  }
+  .adm-pagehead h1 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .adm-pagehead .adm-sub {
+    font-size: 14px;
+  }
+  /* List screens: just the large title (+ its action), like iOS */
+  .adm-pagehead:not(.has-back) {
+    flex-wrap: nowrap;
+  }
+  .adm-pagehead:not(.has-back) .adm-sub {
+    display: none;
+  }
+  .adm-pagehead.has-back {
     position: sticky;
     top: 0;
     z-index: 30;
-    height: auto;
-    flex-direction: row;
+    margin: 0 -16px 14px;
+    padding: calc(8px + env(safe-area-inset-top)) 16px 12px;
+    background: rgba(246, 246, 244, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+  }
+  .adm-pagehead.has-back h1 {
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .adm-pagehead.has-back .adm-sub {
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .adm-back {
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--a-line);
-    overflow-x: auto;
-    scrollbar-width: none;
+    min-height: 34px;
+    margin: 0 0 2px -2px;
+    font-size: 16px;
+    color: var(--a-ink);
   }
-  .adm-side::-webkit-scrollbar {
-    display: none;
-  }
-  .adm-brand {
-    padding: 0 6px 0 0;
-  }
-  .adm-brand span {
-    display: none;
-  }
-  .adm-nav {
-    flex-direction: row;
-  }
-  .adm-navlink {
-    padding: 8px 10px;
-    gap: 7px;
-  }
-  .adm-side-foot {
-    flex-direction: row;
-    align-items: center;
-    margin: 0 0 0 auto;
-    border: 0;
-    padding: 0;
-  }
-  .adm-navlink.subtle span,
-  .adm-user span {
-    display: none;
-  }
-  .adm-user {
-    padding: 0 4px;
-  }
-  .adm-main {
-    padding: 18px 16px 120px;
-  }
-  .adm-savebar {
-    left: 0;
-    padding: 10px 16px;
-  }
-  .adm-pagehead h1 {
-    font-size: 22px;
+  .adm-pagehead-actions .adm-btn {
+    min-height: 36px;
   }
 
-  /* Tables become stacked cards */
-  .adm-orders thead,
-  .adm-products thead {
-    display: none;
+  /* Cards */
+  .adm-card {
+    border-radius: 14px;
+    padding: 16px;
+    border-width: 0.5px;
+    margin-bottom: 14px;
   }
-  .adm-orders tr,
-  .adm-products tr {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 4px 12px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--a-line);
+  .adm-card h2 {
+    font-size: 16px;
   }
-  .adm-orders td,
-  .adm-products td {
-    padding: 0;
-    border: 0;
-    text-align: left;
+  .adm-narrow {
+    max-width: none;
   }
-  .adm-orders td[data-label="Date"],
-  .adm-orders td[data-label="Status"],
-  .adm-orders td[data-label="Total"],
-  .adm-products td[data-label="Status"],
-  .adm-products td[data-label="Price"] {
-    justify-self: end;
-    text-align: right;
-  }
-  .adm-orders td[data-label="Items"],
-  .adm-orders td[data-label="City"],
-  .adm-products td[data-label="Total"] {
-    display: none;
-  }
-  .adm-products td[data-label="Product"],
-  .adm-products td[data-label="Stock"] {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 560px) {
   .adm-tiles {
     gap: 10px;
+    margin-bottom: 14px;
   }
   .adm-tile {
-    padding: 12px 14px;
+    border-radius: 14px;
+    padding: 14px;
+    border-width: 0.5px;
+  }
+  .adm-tile-label {
+    font-size: 13px;
   }
   .adm-tile-value {
-    font-size: 24px;
+    font-size: 26px;
+  }
+
+  /* Lists as grouped cells */
+  .adm-cells {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+    background: var(--a-surface);
+    border: 0.5px solid var(--a-line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .adm-cells li {
+    position: relative;
+  }
+  .adm-cells li + li::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 0;
+    height: 0.5px;
+    background: var(--a-line-2);
+  }
+  .adm-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 11px 14px 11px 16px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .adm-cell:active {
+    background: #ededeb;
+  }
+  .adm-cell-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .adm-cell-title {
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .adm-cell-sub {
+    font-size: 13.5px;
+    color: var(--a-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .adm-cell-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex: none;
+  }
+  .adm-cell-amount {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .adm-cell .adm-thumb {
+    width: 46px;
+    height: 58px;
+    border-radius: 8px;
+  }
+  .adm-cell .adm-sizes {
+    margin-top: 4px;
+  }
+  .adm-chevron {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-left: 2px;
+    border-top: 2px solid #c7c7cc;
+    border-right: 2px solid #c7c7cc;
+    transform: rotate(45deg);
+  }
+  .adm-list-row {
+    min-height: 54px;
+  }
+
+  /* Filters + search */
+  .adm-tabs {
+    gap: 8px;
+    margin: 0 -16px 12px;
+    padding: 0 16px 2px;
+    border-bottom: 0;
+  }
+  .adm-tabs button {
+    border: 0;
+    border-radius: 999px;
+    background: #e8e8e5;
+    padding: 7px 14px;
+    font-size: 14px;
+    color: var(--a-ink);
+  }
+  .adm-tabs button.on {
+    background: var(--a-ink);
+    color: #fff;
+  }
+  .adm-tabs button.on span {
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .adm-search {
+    max-width: none;
+    background: #e8e8e5;
+    border-color: transparent;
+    border-radius: 10px;
+  }
+
+  /* Touch-sized controls; 16px text stops iPhone zooming into fields */
+  .adm-btn {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+  .adm-field input,
+  .adm-field select,
+  .adm-field textarea,
+  .adm-input,
+  .adm-search {
+    font-size: 16px;
+    min-height: 44px;
+    border-radius: 10px;
   }
   .adm-row {
     flex-direction: column;
     gap: 0;
   }
+  .adm-status-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .adm-status-row .adm-btns,
+  .adm-detail-side .adm-btns {
+    width: 100%;
+  }
+  .adm-status-row .adm-btns .adm-btn,
+  .adm-detail-side .adm-btns .adm-btn {
+    flex: 1 1 auto;
+  }
+  .adm-manual select.adm-input {
+    width: 100%;
+  }
   .adm-steps span {
-    font-size: 10.5px;
+    font-size: 11px;
   }
-  .adm-card {
-    padding: 16px;
+
+  /* Order detail */
+  .adm-print-btn {
+    display: none !important;
   }
-  .adm-search {
-    max-width: none;
+  .adm-inline-form {
+    flex-direction: row;
+    align-items: center;
+  }
+  .adm-inline-form .adm-btn {
+    flex: none;
+  }
+  .adm-items li {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 2px;
+    align-items: center;
+  }
+  .adm-items li > .adm-thumb,
+  .adm-items li > .adm-items-info {
+    grid-row: 1 / 3;
+  }
+  .adm-items li > .adm-num:last-child {
+    grid-column: 3;
+    grid-row: 1;
+    font-weight: 600;
+  }
+  .adm-items li > .adm-num.muted {
+    grid-column: 3;
+    grid-row: 2;
+    font-size: 12.5px;
+  }
+  .adm-timeline li {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* Product editor */
+  .adm-images {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .adm-image-tools button {
+    width: 30px;
+    height: 30px;
+  }
+  .adm-savebar {
+    left: 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  .adm-savebar .adm-btn {
+    min-height: 42px;
+  }
+
+  /* Toasts sit above the tab bar */
+  .adm-toasts {
+    bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+  .adm-shell.is-detail ~ .adm-toasts,
+  .adm-toasts {
+    max-width: calc(100vw - 24px);
+  }
+
+  .adm-center {
+    min-height: 100dvh;
+    align-items: start;
+    padding-top: calc(12vh + env(safe-area-inset-top));
+  }
+  .adm-login {
+    padding: 26px 20px;
+    border-radius: 18px;
   }
 }
 
@@ -1295,18 +1586,31 @@ textarea.adm-input {
 }
 
 /* ------------------------------------------------------------ notifications */
-.adm-notif-preview {
+.adm-notif-stage {
+  margin: 14px 0 8px;
+  padding: 22px 12px;
+  border-radius: 16px;
+  background: #2b2b2b url("/images/hero.webp") center 35% / cover;
+}
+.adm-notif-preview,
+.adm-banner {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  background: rgba(236, 233, 228, 0.9);
-  border-radius: 20px;
+  border-radius: 22px;
   padding: 12px 14px;
-  margin: 16px 0 18px;
-  max-width: 420px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  background: rgba(242, 242, 240, 0.66);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  color: #111;
 }
-.adm-notif-preview img {
+.adm-notif-preview {
+  max-width: 420px;
+  margin: 0 auto;
+}
+.adm-notif-preview img,
+.adm-banner img {
   width: 38px;
   height: 38px;
   border-radius: 9px;
@@ -1316,19 +1620,77 @@ textarea.adm-input {
   flex: 1;
   min-width: 0;
 }
-.adm-notif-top {
+.adm-notif-top,
+.adm-banner-top {
   display: flex;
   justify-content: space-between;
   gap: 8px;
 }
-.adm-notif-top span {
-  font-size: 12.5px;
-  color: #77736d;
+.adm-notif-top span,
+.adm-banner-top span {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+}
+.adm-notif-from {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
 }
 .adm-notif-preview p {
   margin: 1px 0 0;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.35;
+}
+.adm-banner-wrap {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 70;
+  width: min(420px, calc(100vw - 16px));
+  transform: translateX(-50%);
+  animation: adm-banner-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+.adm-banner {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.adm-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14.5px;
+  line-height: 1.32;
+}
+.adm-banner-close {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(60, 60, 60, 0.75);
+  color: #fff;
+  font-size: 16px;
+  line-height: 24px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.adm-banner-wrap:hover .adm-banner-close,
+.adm-banner-close:focus-visible {
+  opacity: 1;
+}
+@keyframes adm-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -24px) scale(0.96);
+  }
 }
 .adm-steps-list ol {
   margin: 8px 0 0;
