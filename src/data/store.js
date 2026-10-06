@@ -84,14 +84,13 @@ export const craft = {
   cta: { label: "Explore Autonomy", to: "/collections/frontpage" },
 };
 
-// Lookbook moodboard — a Pinterest-style mixed board.
+// Lookbook moodboard (home page). Add new looks to public/images/lookbook/
+// and list them here — the board sizes its columns to the count.
 export const lookbook = [
-  "/images/microgrid-quarter-zipper-4.webp",
-  "/images/interlock-shirt-with-zip-closure-navy-3.webp",
-  "/images/tropical-pant-4-3.webp",
-  "/images/yarn-dyed-stripe-tee-3.webp",
-  "/images/interlock-shirt-with-zip-closure-4.webp",
-  "/images/micro-block-drop-needle-knit-4.webp",
+  { src: "/images/lookbook/look-01.webp", width: 720, height: 1280, alt: "Black quarter-zip with pleated black trousers" },
+  { src: "/images/lookbook/look-02.webp", width: 720, height: 1080, alt: "Black quarter-zip and trousers, seated on a studio stool" },
+  { src: "/images/lookbook/look-03.webp", width: 720, height: 1280, alt: "Navy and white stripe tee with pleated black trousers" },
+  { src: "/images/lookbook/look-04.webp", width: 720, height: 1073, alt: "Navy stripe tee with wide black trousers, full look" },
 ];
 
 // Small trust/values strip.
@@ -235,6 +234,7 @@ export const products = [
       "/images/interlock-shirt-with-zip-closure-2.webp",
       "/images/interlock-shirt-with-zip-closure-3.webp",
       "/images/interlock-shirt-with-zip-closure-4.webp",
+      "/images/interlock-shirt-with-zip-closure-5.webp",
     ],
     sizes: [
       { size: "S", qty: 20 },
@@ -277,6 +277,7 @@ export const products = [
       "/images/yarn-dyed-stripe-tee-1.webp",
       "/images/yarn-dyed-stripe-tee-2.webp",
       "/images/yarn-dyed-stripe-tee-3.webp",
+      "/images/yarn-dyed-stripe-tee-4.webp",
     ],
     sizes: [
       { size: "S", qty: 5 },

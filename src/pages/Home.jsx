@@ -142,10 +142,14 @@ export default function Home() {
             <Link to="/collections/all-top">Shop the looks</Link>
           </div>
         </Reveal>
-        <div className="lookboard">
-          {lookbook.map((src, i) => (
-            <Reveal key={src} delay={(i % 3) * 70} className="lookpin">
-              <img src={src} alt="Fanaar lookbook" loading="lazy" />
+        {/* 4 or 8 looks read best in 4 columns; otherwise 3 */}
+        <div
+          className="lookboard"
+          style={{ "--look-cols": lookbook.length % 4 === 0 && lookbook.length % 3 !== 0 ? 4 : 3 }}
+        >
+          {lookbook.map((look, i) => (
+            <Reveal key={look.src} delay={(i % 4) * 70} className="lookpin">
+              <img src={look.src} width={look.width} height={look.height} alt={look.alt} loading="lazy" />
             </Reveal>
           ))}
         </div>

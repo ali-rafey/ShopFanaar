@@ -790,7 +790,7 @@ button {
 
 /* ---------- Lookbook board ---------- */
 .lookboard {
-  column-count: 3;
+  column-count: var(--look-cols, 3);
   column-gap: 20px;
 }
 .lookpin {
@@ -802,6 +802,7 @@ button {
 }
 .lookpin img {
   width: 100%;
+  height: auto;
   transition: transform 1.4s var(--ease);
 }
 .lookpin:hover img {
