@@ -112,6 +112,18 @@ export const collections = [
   { handle: "landing-page-collection", title: "New In", group: "featured" },
 ];
 
+// The size chart every piece has shown so far. Each product now has its own
+// (products.size_chart, edited in the admin); new products start from this.
+export const defaultSizeChart = {
+  note: "Fits true to size with a relaxed drape. If you prefer a closer fit, size down.",
+  columns: ["Chest (in)", "Length (in)"],
+  rows: [
+    { size: "S", values: ["38–40", "27"] },
+    { size: "M", values: ["40–42", "28"] },
+    { size: "L", values: ["42–44", "29"] },
+  ],
+};
+
 const D =
   "Color tones may appear slightly different in imagery due to lighting conditions and display variations.";
 

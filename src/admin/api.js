@@ -210,6 +210,7 @@ export async function saveProduct(product, original) {
     disclaimer: product.disclaimer || null,
     price: product.price,
     compare_at_price: product.compareAtPrice || null,
+    size_chart: product.sizeChart ?? null,
     images: product.images,
     collections: product.collections,
     status: product.status,

@@ -70,6 +70,7 @@ export default function Product() {
   const selected = product.sizes.find((s) => s.size === size);
   const canAdd = selected && selected.qty > 0;
   const saved = isSaved(product.id);
+  const chart = product.sizeChart;
   const related = catalog.getRelated(product, 3);
   const colorways = catalog.getColorways(product);
 
@@ -175,14 +176,16 @@ export default function Product() {
 
           <div className="size-row">
             <span className="size-label">Size{size ? `: ${size}` : ""}</span>
-            <button
-              className="size-guide-btn"
-              onClick={() =>
-                setOpenPanel(openPanel === "sizing" ? null : "sizing")
-              }
-            >
-              Size guide
-            </button>
+            {chart && (
+              <button
+                className="size-guide-btn"
+                onClick={() =>
+                  setOpenPanel(openPanel === "sizing" ? null : "sizing")
+                }
+              >
+                Size guide
+              </button>
+            )}
           </div>
 
           <div className="sizes">
@@ -240,22 +243,31 @@ export default function Product() {
               )}
             </Panel>
 
-            <Panel id="sizing" title="Size & fit" open={openPanel === "sizing"} onToggle={setOpenPanel}>
-              <p>
-                Fits true to size with a relaxed drape. If you prefer a closer
-                fit, size down.
-              </p>
-              <table className="size-table">
-                <thead>
-                  <tr><th>Size</th><th>Chest (in)</th><th>Length (in)</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>S</td><td>38–40</td><td>27</td></tr>
-                  <tr><td>M</td><td>40–42</td><td>28</td></tr>
-                  <tr><td>L</td><td>42–44</td><td>29</td></tr>
-                </tbody>
-              </table>
-            </Panel>
+            {chart && (
+              <Panel id="sizing" title="Size & fit" open={openPanel === "sizing"} onToggle={setOpenPanel}>
+                {chart.note && <p>{chart.note}</p>}
+                {chart.rows.length > 0 && (
+                  <div className="size-table-wrap">
+                    <table className="size-table">
+                      <thead>
+                        <tr>
+                          <th>Size</th>
+                          {chart.columns.map((c, i) => <th key={i}>{c}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chart.rows.map((r, i) => (
+                          <tr key={i}>
+                            <td>{r.size}</td>
+                            {r.values.map((v, i) => <td key={i}>{v || "—"}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
+            )}
 
             <Panel id="care" title="Care" open={openPanel === "care"} onToggle={setOpenPanel}>
               <p>

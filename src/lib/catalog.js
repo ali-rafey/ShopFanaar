@@ -49,11 +49,25 @@ export function toProduct(row) {
     collections: row.collections || [],
     status: row.status,
     position: row.position ?? 0,
+    sizeChart: toSizeChart(row.size_chart),
     sizes: (row.product_variants || [])
       .slice()
       .sort((a, b) => a.position - b.position)
       .map((v) => ({ id: v.id, size: v.size, qty: v.stock, sku: v.sku || "" })),
   };
+}
+
+// A product's size chart, tidied: text trimmed, rows without a size dropped,
+// one value per column. null when there is nothing to show.
+export function toSizeChart(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const text = (v) => (v == null ? "" : String(v).trim());
+  const columns = Array.isArray(raw.columns) ? raw.columns.map(text) : [];
+  const rows = (Array.isArray(raw.rows) ? raw.rows : [])
+    .map((r) => ({ size: text(r?.size), values: columns.map((_, i) => text(r?.values?.[i])) }))
+    .filter((r) => r.size);
+  const note = text(raw.note);
+  return note || rows.length ? { note, columns, rows } : null;
 }
 
 export function toSettings(row) {

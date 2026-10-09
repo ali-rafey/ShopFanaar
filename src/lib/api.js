@@ -10,10 +10,13 @@
 //              seeded from src/data/store.js, so checkout + admin can be tried
 //   static   — production build without keys: bundled catalog, no checkout
 import {
-  products as bundledProducts,
+  products as storeProducts,
   collections as bundledCollections,
+  defaultSizeChart,
 } from "../data/store";
 import { toProduct, toSettings } from "./catalog";
+
+const bundledProducts = storeProducts.map((p) => ({ sizeChart: defaultSizeChart, ...p }));
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -68,7 +71,7 @@ async function rest(path, body) {
 }
 
 const CATALOG_SELECT =
-  "id,handle,title,description,disclaimer,price,compare_at_price,images,collections,status,position," +
+  "id,handle,title,description,disclaimer,price,compare_at_price,images,collections,status,position,size_chart," +
   "product_variants(id,size,stock,sku,position)";
 
 export function bundledCatalog() {

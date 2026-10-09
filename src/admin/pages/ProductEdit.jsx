@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
 import { prepareImage } from "../image";
+import { defaultSizeChart } from "../../data/store";
+import { toSizeChart } from "../../lib/catalog";
 import { ConfirmButton, ErrorBox, PageHead, Spinner, useLoad, useToast } from "../ui";
 
 const DEFAULT_DISCLAIMER =
@@ -18,6 +20,13 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
+const chartForm = (c) => ({
+  note: c?.note || "",
+  columns: [...(c?.columns || [])],
+  rows: (c?.rows || []).map((r) => ({ size: r.size, values: [...r.values] })),
+});
+const NO_CHART = { note: "", columns: [], rows: [] };
+
 // Editor keeps numbers as strings so fields can be cleared while typing.
 function toForm(p) {
   return {
@@ -32,6 +41,7 @@ function toForm(p) {
     status: p.status,
     position: String(p.position ?? 0),
     sizes: p.sizes.map((s) => ({ id: s.id, size: s.size, qty: String(s.qty), sku: s.sku || "" })),
+    chart: chartForm(p.sizeChart),
   };
 }
 
@@ -47,6 +57,7 @@ const BLANK = {
   status: "draft",
   position: "0",
   sizes: ["S", "M", "L"].map((size) => ({ size, qty: "0", sku: "" })),
+  chart: chartForm(defaultSizeChart),
 };
 
 const int = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim()) : NaN);
@@ -67,6 +78,17 @@ function validate(f) {
   });
   if (f.status === "active" && f.sizes.length === 0) e.sizes = "Active products need at least one size.";
   if (f.status === "active" && f.images.length === 0) e.images = "Active products need at least one photo.";
+  f.chart.columns.forEach((c, i) => {
+    if (!c.trim()) e[`chartCol${i}`] = "Name it, or remove it.";
+  });
+  const chartSizes = new Set();
+  f.chart.rows.forEach((r, i) => {
+    const k = r.size.trim().toUpperCase();
+    if (!k) e[`chartRow${i}`] = "Size needed.";
+    else if (chartSizes.has(k)) e[`chartRow${i}`] = "Duplicate size.";
+    chartSizes.add(k);
+  });
+  if (f.chart.rows.length && !f.chart.columns.length) e.chart = "Add at least one measurement column.";
   return e;
 }
 
@@ -77,11 +99,12 @@ export default function ProductEdit() {
   const toast = useToast();
 
   const res = useLoad(
-    () => Promise.all([isNew ? null : api.getProduct(id), api.listCollections()]),
+    () => Promise.all([isNew ? null : api.getProduct(id), api.listCollections(), api.listProducts()]),
     [id]
   );
   const original = res.data?.[0] || null;
   const collections = res.data?.[1] || [];
+  const chartSources = (res.data?.[2] || []).filter((p) => p.id !== id && p.sizeChart);
 
   const [form, setForm] = useState(null);
   const [initial, setInitial] = useState(null);
@@ -132,6 +155,16 @@ export default function ProductEdit() {
   };
   const setSize = (i, k, v) =>
     setForm((f) => ({ ...f, sizes: f.sizes.map((s, j) => (j === i ? { ...s, [k]: v } : s)) }));
+  // Editing one cell clears that cell's error; adding or removing rows and
+  // columns shifts positions, so it clears every chart error.
+  const updateChart = (fn, errorKey) => {
+    setForm((f) => ({ ...f, chart: fn(f.chart) }));
+    setErrors((e) =>
+      errorKey
+        ? { ...e, [errorKey]: undefined }
+        : Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith("chart")))
+    );
+  };
 
   async function onFiles(files) {
     const list = [...files];
@@ -187,6 +220,7 @@ export default function ProductEdit() {
         status: form.status,
         position: int(form.position) || 0,
         sizes: form.sizes.map((s) => ({ id: s.id, size: s.size.trim(), qty: int(s.qty), sku: s.sku })),
+        sizeChart: toSizeChart(form.chart),
       };
       const savedId = await api.saveProduct(product, original);
       const dropped = (original?.images || []).filter((u) => !form.images.includes(u));
@@ -304,56 +338,58 @@ export default function ProductEdit() {
               <span className="adm-hint">Stock goes down automatically with every order.</span>
             </div>
             {errors.sizes && <p className="adm-field-error">{errors.sizes}</p>}
-            <table className="adm-table adm-size-table">
-              <thead>
-                <tr>
-                  <th>Size</th>
-                  <th>In stock</th>
-                  <th>SKU <span className="muted">(optional)</span></th>
-                  <th aria-label="Remove" />
-                </tr>
-              </thead>
-              <tbody>
-                {form.sizes.map((s, i) => (
-                  <tr key={s.id || `new${i}`}>
-                    <td>
-                      <input
-                        className={`adm-input ${errors[`size${i}`] ? "bad" : ""}`}
-                        value={s.size}
-                        onChange={(e) => setSize(i, "size", e.target.value)}
-                        aria-label="Size"
-                      />
-                      {errors[`size${i}`] && <span className="adm-field-error">{errors[`size${i}`]}</span>}
-                    </td>
-                    <td>
-                      <div className="adm-stepper">
-                        <button type="button" onClick={() => setSize(i, "qty", String(Math.max(0, (int(s.qty) || 0) - 1)))} aria-label="Decrease stock">−</button>
-                        <input
-                          className={`adm-input ${errors[`qty${i}`] ? "bad" : ""}`}
-                          inputMode="numeric"
-                          value={s.qty}
-                          onChange={(e) => setSize(i, "qty", e.target.value)}
-                          aria-label={`Stock for size ${s.size}`}
-                        />
-                        <button type="button" onClick={() => setSize(i, "qty", String((int(s.qty) || 0) + 1))} aria-label="Increase stock">+</button>
-                      </div>
-                    </td>
-                    <td>
-                      <input className="adm-input" value={s.sku} onChange={(e) => setSize(i, "sku", e.target.value)} aria-label="SKU" />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="adm-link danger"
-                        onClick={() => set("sizes", form.sizes.filter((_, j) => j !== i))}
-                      >
-                        Remove
-                      </button>
-                    </td>
+            <div className="adm-table-scroll">
+              <table className="adm-table adm-size-table">
+                <thead>
+                  <tr>
+                    <th>Size</th>
+                    <th>In stock</th>
+                    <th>SKU <span className="muted">(optional)</span></th>
+                    <th aria-label="Remove" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {form.sizes.map((s, i) => (
+                    <tr key={s.id || `new${i}`}>
+                      <td>
+                        <input
+                          className={`adm-input ${errors[`size${i}`] ? "bad" : ""}`}
+                          value={s.size}
+                          onChange={(e) => setSize(i, "size", e.target.value)}
+                          aria-label="Size"
+                        />
+                        {errors[`size${i}`] && <span className="adm-field-error">{errors[`size${i}`]}</span>}
+                      </td>
+                      <td>
+                        <div className="adm-stepper">
+                          <button type="button" onClick={() => setSize(i, "qty", String(Math.max(0, (int(s.qty) || 0) - 1)))} aria-label="Decrease stock">−</button>
+                          <input
+                            className={`adm-input ${errors[`qty${i}`] ? "bad" : ""}`}
+                            inputMode="numeric"
+                            value={s.qty}
+                            onChange={(e) => setSize(i, "qty", e.target.value)}
+                            aria-label={`Stock for size ${s.size}`}
+                          />
+                          <button type="button" onClick={() => setSize(i, "qty", String((int(s.qty) || 0) + 1))} aria-label="Increase stock">+</button>
+                        </div>
+                      </td>
+                      <td>
+                        <input className="adm-input" value={s.sku} onChange={(e) => setSize(i, "sku", e.target.value)} aria-label="SKU" />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="adm-link danger"
+                          onClick={() => set("sizes", form.sizes.filter((_, j) => j !== i))}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="adm-btns">
               <button type="button" className="adm-btn" onClick={() => set("sizes", [...form.sizes, { size: "", qty: "0", sku: "" }])}>
                 + Add size
@@ -370,6 +406,14 @@ export default function ProductEdit() {
               ))}
             </div>
           </section>
+
+          <SizeChartCard
+            chart={form.chart}
+            update={updateChart}
+            errors={errors}
+            stockSizes={form.sizes.map((s) => s.size.trim()).filter(Boolean)}
+            sources={chartSources}
+          />
         </div>
 
         <div className="adm-detail-side">
@@ -452,6 +496,155 @@ export default function ProductEdit() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SizeChartCard({ chart, update, errors, stockSizes, sources }) {
+  const { columns, rows } = chart;
+  const hasChart = Boolean(chart.note.trim() || columns.length || rows.length);
+  const missing = stockSizes.filter(
+    (s) => !rows.some((r) => r.size.trim().toUpperCase() === s.toUpperCase())
+  );
+
+  const setColumn = (c, v) =>
+    update((ch) => ({ ...ch, columns: ch.columns.map((x, j) => (j === c ? v : x)) }), `chartCol${c}`);
+  const addColumn = () =>
+    update((ch) => ({
+      ...ch,
+      columns: [...ch.columns, ""],
+      rows: ch.rows.map((r) => ({ ...r, values: [...r.values, ""] })),
+    }));
+  const removeColumn = (c) =>
+    update((ch) => ({
+      ...ch,
+      columns: ch.columns.filter((_, j) => j !== c),
+      rows: ch.rows.map((r) => ({ ...r, values: r.values.filter((_, j) => j !== c) })),
+    }));
+  const setRowSize = (i, v) =>
+    update((ch) => ({ ...ch, rows: ch.rows.map((r, j) => (j === i ? { ...r, size: v } : r)) }), `chartRow${i}`);
+  const setCell = (i, c, v) =>
+    update((ch) => ({
+      ...ch,
+      rows: ch.rows.map((r, j) => (j === i ? { ...r, values: r.values.map((x, k) => (k === c ? v : x)) } : r)),
+    }), "chart");
+  const addRow = (size = "") =>
+    update((ch) => ({ ...ch, rows: [...ch.rows, { size, values: ch.columns.map(() => "") }] }));
+  const removeRow = (i) => update((ch) => ({ ...ch, rows: ch.rows.filter((_, j) => j !== i) }));
+
+  function copyFrom(value) {
+    const source = value === "standard" ? defaultSizeChart : sources.find((p) => p.id === value)?.sizeChart;
+    if (source) update(() => chartForm(source));
+  }
+
+  return (
+    <section className="adm-card">
+      <div className="adm-card-head">
+        <h2>Size chart</h2>
+        <span className="adm-hint">Shown under “Size guide” on the product page.</span>
+      </div>
+
+      <Field label="Fit note" hint="Optional. A line above the chart, e.g. how the piece fits.">
+        <textarea rows={2} value={chart.note} onChange={(e) => update((ch) => ({ ...ch, note: e.target.value }), "chart")} />
+      </Field>
+
+      {columns.length || rows.length ? (
+        <div className="adm-table-scroll">
+          <table className="adm-table adm-size-table adm-chart">
+            <thead>
+              <tr>
+                <th>Size</th>
+                {columns.map((c, ci) => (
+                  <th key={ci}>
+                    <div className="adm-chart-col">
+                      <input
+                        className={`adm-input ${errors[`chartCol${ci}`] ? "bad" : ""}`}
+                        value={c}
+                        placeholder="e.g. Chest (in)"
+                        onChange={(e) => setColumn(ci, e.target.value)}
+                        aria-label={`Column ${ci + 1} name`}
+                      />
+                      <button type="button" className="adm-chart-x" onClick={() => removeColumn(ci)} aria-label={`Remove column ${c || ci + 1}`}>
+                        ✕
+                      </button>
+                    </div>
+                    {errors[`chartCol${ci}`] && <span className="adm-field-error">{errors[`chartCol${ci}`]}</span>}
+                  </th>
+                ))}
+                <th aria-label="Remove" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td>
+                    <input
+                      className={`adm-input ${errors[`chartRow${i}`] ? "bad" : ""}`}
+                      value={r.size}
+                      onChange={(e) => setRowSize(i, e.target.value)}
+                      aria-label={`Row ${i + 1} size`}
+                    />
+                    {errors[`chartRow${i}`] && <span className="adm-field-error">{errors[`chartRow${i}`]}</span>}
+                  </td>
+                  {r.values.map((v, ci) => (
+                    <td key={ci}>
+                      <input
+                        className="adm-input"
+                        value={v}
+                        onChange={(e) => setCell(i, ci, e.target.value)}
+                        aria-label={`${columns[ci] || `Column ${ci + 1}`} for size ${r.size || i + 1}`}
+                      />
+                    </td>
+                  ))}
+                  <td>
+                    <button type="button" className="adm-chart-x" onClick={() => removeRow(i)} aria-label={`Remove size ${r.size || i + 1}`}>
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="adm-hint adm-chart-empty">
+          {chart.note.trim()
+            ? "No measurements — the product page shows the fit note only."
+            : "No size chart — the product page won’t show a size guide."}
+        </p>
+      )}
+      {errors.chart && <p className="adm-field-error">{errors.chart}</p>}
+
+      <div className="adm-btns">
+        <button type="button" className="adm-btn" onClick={() => addRow()}>
+          + Add row
+        </button>
+        <button type="button" className="adm-btn" onClick={addColumn}>
+          + Add column
+        </button>
+        {missing.map((s) => (
+          <button type="button" key={s} className="adm-chip" onClick={() => addRow(s)}>
+            + {s}
+          </button>
+        ))}
+      </div>
+
+      <div className="adm-chart-foot">
+        <select className="adm-input" value="" onChange={(e) => copyFrom(e.target.value)} aria-label="Copy a size chart">
+          <option value="">Copy a chart from…</option>
+          <option value="standard">Standard Fanaar chart</option>
+          {sources.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+            </option>
+          ))}
+        </select>
+        {hasChart && (
+          <button type="button" className="adm-link danger" onClick={() => update(() => NO_CHART)}>
+            Remove chart
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 

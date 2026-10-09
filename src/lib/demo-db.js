@@ -3,7 +3,7 @@
 // supabase/migrations/*_init.sql closely enough to click through checkout and
 // the admin before Supabase keys exist. Never included in production builds
 // (see loadDemo in ./api.js).
-import { products as P, collections as C } from "../data/store";
+import { products as P, collections as C, defaultSizeChart } from "../data/store";
 import { ApiError } from "./api";
 
 const DB_KEY = "fanaar-demo-db-v1";
@@ -28,6 +28,7 @@ function seed() {
       disclaimer: p.disclaimer,
       price: p.price,
       compare_at_price: p.compareAtPrice,
+      size_chart: clone(defaultSizeChart),
       images: [...p.images],
       collections: [...p.collections],
       status: "active",
