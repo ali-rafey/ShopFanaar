@@ -127,13 +127,26 @@ typed) to `/api/order-confirmed`. That Vercel function:
 
 Failures never block an order (the browser ignores the response).
 
+The browsing events get server copies too. `src/lib/pixel.js` gives every
+PageView, ViewContent, AddToCart and InitiateCheckout an event ID, fires the
+pixel with it, and posts the same event to `/api/shop-activity`, which
+forwards it to Meta with the shopper's IP, browser and `_fbp` / `_fbc`
+cookies. No personal details are sent with these, and product data is
+trimmed to the pixel's own fields. Bots are skipped.
+
+When an ad blocker stops the pixel, `pixel.js` still sets `_fbp` and, from
+an ad click's `?fbclid=`, `_fbc` in Meta's own format, so those visits can
+still be matched to the visitor and to the ad. Shared code for both
+functions is in `server/meta.js`.
+
 - **Vercel env (type "Secret"):** `META_CAPI_TOKEN`, generated in Events
   Manager → fanaar's pixel → Settings → Conversions API → *Generate access
   token*.
 - **Testing:** set `META_TEST_EVENT_CODE` to the code from Events Manager →
   Test events, redeploy, place an order, and watch it arrive as "Server".
   Remove the variable afterwards, or real orders keep going to the test tab.
-- Errors appear in Vercel → Logs, prefixed `order-confirmed:`.
+- Errors appear in Vercel → Logs, prefixed `order-confirmed:` or
+  `shop-activity:`.
 
 ## Order notifications (phone)
 

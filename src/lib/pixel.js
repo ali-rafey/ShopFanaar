@@ -10,6 +10,11 @@
 // sent from our server via the Conversions API), Lead (newsletter), Contact
 // (contact form).
 //
+// PageView, ViewContent, AddToCart and InitiateCheckout are also sent to our
+// server (api/shop-activity.js) under the same eventID, and Purchase via
+// api/order-confirmed.js, so Meta still gets them when an ad blocker or iOS
+// stops the pixel.
+//
 // The pixel starts in main.jsx before React renders, so events fired from a
 // page's first effects (e.g. ViewContent on a product landing) are never
 // lost. It is never loaded on /admin.
@@ -17,13 +22,37 @@ export const PIXEL_ID =
   import.meta.env.VITE_META_PIXEL_ID || "1278679466701518";
 
 const CURRENCY = "PKR";
+const SERVER_EVENTS = new Set(["PageView", "ViewContent", "AddToCart", "InitiateCheckout"]);
 let loaded = false;
+
+// Meta's first-party cookies: _fbp (this browser) and _fbc (the ad click that
+// brought it here, from ?fbclid=). The pixel sets them itself; when an ad
+// blocker stops the pixel we set them in Meta's format, so the server copies
+// of events can still be matched to the visitor and to the ad.
+function ensureMetaCookies() {
+  const read = (name) => document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1];
+  const write = (name, value) => {
+    const domain = /(^|\.)shopfanaar\.com$/.test(location.hostname) ? "; domain=.shopfanaar.com" : "";
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${name}=${value}; max-age=7776000; path=/; SameSite=Lax${domain}${secure}`;
+  };
+  try {
+    if (!read("_fbp")) write("_fbp", `fb.1.${Date.now()}.${Math.floor(Math.random() * 1e10)}`);
+    const fbclid = new URLSearchParams(location.search).get("fbclid");
+    if (fbclid && /^[\w-]+$/.test(fbclid) && !(read("_fbc") || "").endsWith(`.${fbclid}`)) {
+      write("_fbc", `fb.1.${Date.now()}.${fbclid}`);
+    }
+  } catch {
+    /* cookies disabled */
+  }
+}
 
 // Inject the official Meta Pixel base code once. We intentionally do NOT fire
 // the initial PageView here — PageView is tracked on every route change
 // (including first load) so SPA navigations are counted correctly.
 export function initPixel() {
   if (loaded || typeof window === "undefined" || !PIXEL_ID) return;
+  ensureMetaCookies(); // before fbevents.js loads, so the pixel adopts them
 
   /* eslint-disable */
   !(function (f, b, e, v, n, t, s) {
@@ -64,6 +93,8 @@ export function track(event, data, eventID) {
   // route-change PageView effect; send that page's PageView first so Meta
   // always sees PageView → event. Never doubles: one PageView per path.
   if (event !== "PageView") trackPageView();
+  const mirrored = SERVER_EVENTS.has(event);
+  if (mirrored && !eventID) eventID = newEventId(event);
   // Dev builds keep a log (window.__pixelLog) — Meta blocks this pixel on
   // localhost, so this is how events are checked locally.
   if (import.meta.env.DEV) {
@@ -72,6 +103,26 @@ export function track(event, data, eventID) {
   if (window.fbq) {
     if (eventID) window.fbq("track", event, data, { eventID });
     else window.fbq("track", event, data);
+  }
+  if (mirrored) postToServer("/api/shop-activity", { event, id: eventID, url: window.location.href, data });
+}
+
+const newEventId = (event) =>
+  `${event}-${window.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 12)}`;
+
+// Our own /api isn't on ad-blocker lists the way connect.facebook.net is.
+// The Vite dev server has no /api, so dev builds skip it.
+function postToServer(path, body) {
+  if (import.meta.env.DEV) return;
+  try {
+    fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      keepalive: true, // survives navigating away
+    }).catch(() => {});
+  } catch {
+    /* never block the page */
   }
 }
 
@@ -157,24 +208,14 @@ export function trackPurchase(order, customer) {
   sendServerPurchase(order, customer);
 }
 
-// The Vite dev server has no /api, and demo orders never reach Meta.
 function sendServerPurchase(order, customer) {
-  if (import.meta.env.DEV || !customer) return;
-  try {
-    fetch("/api/order-confirmed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: order.id,
-        phone: customer.phone,
-        email: customer.email,
-        url: window.location.href,
-      }),
-      keepalive: true, // survives the redirect to the order page
-    }).catch(() => {});
-  } catch {
-    /* never block checkout */
-  }
+  if (!customer) return;
+  postToServer("/api/order-confirmed", {
+    id: order.id,
+    phone: customer.phone,
+    email: customer.email,
+    url: window.location.href,
+  });
 }
 
 export function trackLead() {
