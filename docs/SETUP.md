@@ -27,7 +27,8 @@ no Shopify dependency at runtime:
    shoppers can never buy the last unit, and a tampered cart can't change a
    price.
 3. The shopper lands on `/order/<id>` (bookmarkable status page). Meta Pixel
-   fires `Purchase`.
+   fires `Purchase`, and the same Purchase goes to Meta from the server
+   (Conversions API, see below).
 4. The order appears instantly in `/admin` (live feed + tab badge). The admin
    confirms (WhatsApp button pre-fills a confirmation message), packs, adds the
    courier + tracking number, ships, and marks delivered / paid. Every step is
@@ -109,6 +110,30 @@ auto-detects Vite (`npm run build`, output `dist`).
 - **Fonts:** Bodoni Moda + Inter, self-hosted in `public/fonts`.
 - **Meta Pixel:** `src/lib/pixel.js` — PageView, ViewContent, AddToCart,
   InitiateCheckout, Purchase. Not loaded on admin pages.
+
+## Meta Conversions API (server-side Purchase)
+
+Every order is also sent to Meta from the server, so it still counts when
+an ad blocker or iOS stops the browser pixel. After `place_order` succeeds,
+the checkout page posts the order id (plus the phone and email the shopper
+typed) to `/api/order-confirmed`. That Vercel function:
+
+- re-reads the order with `get_order_public` and refuses it unless it
+  exists, is under an hour old, isn't cancelled, and the phone matches;
+- hashes phone (as 92…), email, first/last name, city and country with
+  SHA-256 and adds the browser's `_fbp` / `_fbc` cookies, IP and user agent;
+- sends `Purchase` with event ID `order-<uuid>`, the same ID as the pixel's
+  Purchase, so Meta de-duplicates the pair and counts the order once.
+
+Failures never block an order (the browser ignores the response).
+
+- **Vercel env (type "Secret"):** `META_CAPI_TOKEN`, generated in Events
+  Manager → fanaar's pixel → Settings → Conversions API → *Generate access
+  token*.
+- **Testing:** set `META_TEST_EVENT_CODE` to the code from Events Manager →
+  Test events, redeploy, place an order, and watch it arrive as "Server".
+  Remove the variable afterwards, or real orders keep going to the test tab.
+- Errors appear in Vercel → Logs, prefixed `order-confirmed:`.
 
 ## Order notifications (phone)
 

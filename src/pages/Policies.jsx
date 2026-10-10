@@ -104,7 +104,7 @@ export function Privacy() {
       eyebrow="Policies"
       title="Privacy policy"
       lead="What we collect when you use shopfanaar.com, why, and who it's shared with."
-      updated="5 October 2026"
+      updated="10 October 2026"
     >
       <InfoSection title="What we collect">
         <ul>
@@ -140,9 +140,12 @@ export function Privacy() {
             can deliver your parcel and collect payment.
           </li>
           <li>
-            <strong>Meta (Facebook/Instagram):</strong> we use the Meta Pixel to measure our ads.
-            It records visits and actions such as viewing a product, adding to cart and
-            purchasing, and uses cookies in your browser.
+            <strong>Meta (Facebook/Instagram):</strong> we use the Meta Pixel and Meta&apos;s
+            Conversions API to measure our ads. They record visits and actions such as viewing a
+            product, adding to cart and purchasing, and use cookies in your browser. When you
+            order, we also send Meta your mobile number, email (if given), name and city in hashed
+            (one-way scrambled) form, along with the order value, so Meta can tell which ads led to
+            orders.
           </li>
           <li>
             <strong>Service providers</strong> that run the website and store orders securely

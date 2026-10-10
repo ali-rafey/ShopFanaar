@@ -107,7 +107,7 @@ export default function Checkout() {
         customer: { ...form },
         items: items.map((i) => ({ product_id: i.id, size: i.size, qty: i.qty })),
       });
-      trackPurchase(order);
+      trackPurchase(order, form);
       try {
         if (remember) {
           localStorage.setItem(

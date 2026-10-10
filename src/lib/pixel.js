@@ -6,8 +6,9 @@
 //
 // Events: PageView (every route), ViewContent (product page), AddToCart,
 // AddToWishlist (Save), InitiateCheckout (checkout page), Purchase (order
-// accepted, with an eventID for de-duplication against a future Conversions
-// API feed), Lead (newsletter), Contact (contact form).
+// accepted, with an eventID that de-duplicates it against the same Purchase
+// sent from our server via the Conversions API), Lead (newsletter), Contact
+// (contact form).
 //
 // The pixel starts in main.jsx before React renders, so events fired from a
 // page's first effects (e.g. ViewContent on a product landing) are never
@@ -55,8 +56,8 @@ export function initPixel() {
 }
 
 // Standard event wrapper — safe no-op if the pixel hasn't loaded.
-// `eventID` lets Meta de-duplicate against a future server-side
-// (Conversions API) event for the same action.
+// `eventID` lets Meta de-duplicate against the server-side
+// (Conversions API) copy of the same action.
 export function track(event, data, eventID) {
   if (typeof window === "undefined") return;
   // A page's own events (ViewContent, InitiateCheckout…) run before the
@@ -131,8 +132,12 @@ export function trackInitiateCheckout(items, subtotal) {
   });
 }
 
-// Fired once, right after the order is accepted by the backend.
-export function trackPurchase(order) {
+// Fired once, right after the order is accepted by the backend. The same
+// Purchase also goes to Meta from our server (Conversions API,
+// api/order-confirmed.js) with the same eventID, so Meta counts it once even
+// when the browser pixel is blocked. `customer` is the checkout form: the
+// server checks the phone against the order and sends it to Meta hashed.
+export function trackPurchase(order, customer) {
   track(
     "Purchase",
     {
@@ -149,6 +154,27 @@ export function trackPurchase(order) {
     },
     `order-${order.id}`
   );
+  sendServerPurchase(order, customer);
+}
+
+// The Vite dev server has no /api, and demo orders never reach Meta.
+function sendServerPurchase(order, customer) {
+  if (import.meta.env.DEV || !customer) return;
+  try {
+    fetch("/api/order-confirmed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: order.id,
+        phone: customer.phone,
+        email: customer.email,
+        url: window.location.href,
+      }),
+      keepalive: true, // survives the redirect to the order page
+    }).catch(() => {});
+  } catch {
+    /* never block checkout */
+  }
 }
 
 export function trackLead() {
