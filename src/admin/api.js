@@ -72,6 +72,12 @@ export async function getStats() {
   return unwrap(await sb.rpc("admin_stats"));
 }
 
+// Who's on the store right now (Fanaar's own count, not Meta's).
+export async function getLiveVisitors() {
+  if (!sb) return (await demo()).liveVisitors();
+  return unwrap(await sb.rpc("live_visitors"));
+}
+
 // ----------------------------------------------------------------- orders
 
 const ORDER_LIST_COLS =

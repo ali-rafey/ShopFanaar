@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { initPixel, trackPageView } from "./lib/pixel";
+import { trackVisit } from "./lib/visitors";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import CartDrawer from "./components/CartDrawer";
@@ -44,6 +45,11 @@ function Storefront() {
   useEffect(() => {
     initPixel();
     trackPageView(pathname);
+  }, [pathname]);
+
+  // Live visitor count for the admin — Fanaar's own, separate from Meta.
+  useEffect(() => {
+    trackVisit(pathname);
   }, [pathname]);
 
   return (

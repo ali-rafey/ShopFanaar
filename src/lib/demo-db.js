@@ -243,6 +243,65 @@ export async function signOut() {
 
 // -------------------------------------------------------------------- admin
 
+// ------------------------------------------------------------ live visitors
+// Mirrors shop_presence / live_visitors in *_live_visitors.sql.
+
+const VISIT_GAP = 30 * 60e3;
+const LIVE_MS = 75e3;
+
+export function shopPresence({ p_id, p_path, p_source, p_device, p_cart_items, p_country, p_region, p_city, p_lat, p_lng }) {
+  return tx((d) => {
+    d.visitors ||= [];
+    const t = Date.now();
+    const place = p_country ? { country: p_country, region: p_region, city: p_city, lat: p_lat, lng: p_lng } : {};
+    const v = d.visitors.find((x) => x.id === p_id);
+    if (!v) {
+      d.visitors.push({ id: p_id, first_seen: t, visit_start: t, last_seen: t, visits: 1, path: p_path, source: p_source, device: p_device, cart_items: p_cart_items, ...place });
+      return;
+    }
+    if (t - v.last_seen > VISIT_GAP) Object.assign(v, { visit_start: t, visits: v.visits + 1, source: p_source });
+    Object.assign(v, { last_seen: t, path: p_path, device: p_device, cart_items: p_cart_items, ...place });
+  });
+}
+
+export function liveVisitors() {
+  return tx((d) => {
+    const t = Date.now();
+    const all = d.visitors || [];
+    const live = all.filter((v) => t - v.last_seen < LIVE_MS);
+    const count = (key) =>
+      Object.entries(live.reduce((m, v) => ({ ...m, [v[key]]: (m[v[key]] || 0) + 1 }), {}))
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      now: live.length,
+      checking_out: live.filter((v) => v.path === "/checkout").length,
+      with_cart: live.filter((v) => v.cart_items > 0 && v.path !== "/checkout" && v.path !== "/order").length,
+      ordered: live.filter((v) => v.path === "/order").length,
+      pages: count("path").slice(0, 8).map(([path, n]) => ({
+        path,
+        n,
+        title: d.products.find((p) => path === `/products/${p.handle}`)?.title || null,
+      })),
+      sources: count("source").map(([source, n]) => ({ source, n })),
+      devices: Object.fromEntries(count("device")),
+      places: Object.values(
+        live
+          .filter((v) => v.country)
+          .reduce((m, v) => {
+            const k = `${v.country}|${v.city || ""}`;
+            m[k] ||= { city: v.city || null, country: v.country, lat: v.lat, lng: v.lng, n: 0 };
+            m[k].n += 1;
+            return m;
+          }, {})
+      ).sort((a, b) => b.n - a.n),
+      last_30m: all.filter((v) => t - v.last_seen < 30 * 60e3).length,
+      today: all.filter((v) => v.last_seen >= today.getTime()).length,
+    };
+  });
+}
+
 export function stats() {
   return tx((d) => {
     const today = new Date();

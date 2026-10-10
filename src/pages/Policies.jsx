@@ -120,6 +120,14 @@ export function Privacy() {
             message.
           </li>
           <li>
+            <strong>While you browse:</strong> so we can see how many people are on the store,
+            your browser keeps a random ID and tells us which page you&apos;re on, how you arrived
+            (for example from Instagram), your device type, how many items are in your cart and
+            your approximate city, which our hosting provider estimates from your connection
+            (we don&apos;t store your IP address). It isn&apos;t linked to your name or contact
+            details and isn&apos;t shared with anyone.
+          </li>
+          <li>
             <strong>On your device:</strong> your cart, saved pieces and (if you choose) your
             checkout details are stored in your own browser so they&apos;re there next time. We
             don&apos;t see these until you place an order.

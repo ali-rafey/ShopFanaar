@@ -284,6 +284,197 @@
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
+/* Live view (Overview) */
+.adm-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1f7a4d;
+}
+.adm-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22a06b;
+  animation: adm-live-pulse 2s ease-out infinite;
+}
+@keyframes adm-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 160, 107, 0.45);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgba(34, 160, 107, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-live-dot {
+    animation: none;
+  }
+}
+.adm-live-now {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 2px 0 16px;
+}
+.adm-live-now strong {
+  font-size: 46px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.adm-live-now span {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--a-ink-2);
+}
+.adm-live-now small {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--a-muted);
+}
+.adm-live-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.adm-live-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.adm-live-stages li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--a-bg);
+}
+.adm-live-stages strong {
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.adm-live-stages span {
+  font-size: 12px;
+  color: var(--a-muted);
+}
+.adm-live-lists {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.adm-globe {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  justify-self: center;
+}
+.adm-globe canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: pan-y; /* sideways drags spin the globe, vertical ones scroll */
+}
+/* City labels ride on their dots (CSS anchor positioning); browsers without
+   it just show the dots. */
+.adm-globe-label {
+  position: absolute;
+  bottom: anchor(top);
+  left: anchor(center);
+  translate: -50% -7px;
+  padding: 2px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+@supports not (anchor-name: --a) {
+  .adm-globe-label {
+    display: none;
+  }
+}
+.adm-live-sub {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--a-muted);
+}
+.adm-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.adm-bar {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  overflow: hidden;
+}
+.adm-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w);
+  background: #e9f3ed;
+}
+.adm-bar > * {
+  position: relative;
+}
+.adm-bar span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-bar b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.adm-live-devices {
+  margin-top: 14px;
+}
+@media (max-width: 1100px) {
+  .adm-live-lists {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  .adm-live-top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .adm-globe {
+    max-width: 320px;
+  }
+  .adm-live-lists {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
 .adm-tile-note {
   font-size: 12px;
   color: var(--a-muted);

@@ -41,17 +41,20 @@ export class ApiError extends Error {
   }
 }
 
-async function rest(path, body) {
+function restHeaders() {
   const headers = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
   // Legacy anon keys are JWTs and go in Authorization too; the newer
   // publishable keys must only be sent as `apikey`.
   if (SUPABASE_KEY.startsWith("eyJ")) headers.Authorization = `Bearer ${SUPABASE_KEY}`;
+  return headers;
+}
 
+async function rest(path, body) {
   let res;
   try {
     res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
       method: body ? "POST" : "GET",
-      headers,
+      headers: restHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -127,4 +130,16 @@ export async function sendContactMessage(payload) {
   if (BACKEND === "static") throw new ApiError("The contact form isn't available yet.");
   if (BACKEND === "demo") return (await loadDemo()).sendContactMessage(payload);
   await rest("rpc/send_contact_message", { payload });
+}
+
+// Live-visitor presence ping (see ./visitors.js). Fire-and-forget: a failure
+// is silently dropped and never reaches the shopper.
+export function sendVisit(payload) {
+  if (BACKEND === "demo") return loadDemo().then((d) => d.shopPresence(payload)).catch(() => {});
+  if (BACKEND !== "supabase") return Promise.resolve();
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/shop_presence`, {
+    method: "POST",
+    headers: restHeaders(),
+    body: JSON.stringify(payload),
+  }).catch(() => {});
 }
