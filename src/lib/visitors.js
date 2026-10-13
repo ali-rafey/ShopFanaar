@@ -86,7 +86,7 @@ function shouldCount() {
   if (/bot|crawl|spider|slurp|facebookexternalhit|lighthouse|headless/i.test(navigator.userAgent)) return false;
   // The owner's own browsing isn't counted on a browser signed in to the admin.
   try {
-    if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k))) return false;
+    if (localStorage.getItem("fanaar-admin-auth")) return false; // the admin's session (src/admin/api.js)
   } catch {
     /* storage blocked — count as a normal visitor */
   }

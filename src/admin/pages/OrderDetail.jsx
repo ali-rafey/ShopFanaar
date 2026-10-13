@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ALL_STATUSES, nextStatus, STATUS } from "../../lib/orderStatus";
+import { BookingSheet, openPdf } from "../PostEx";
 import {
   ConfirmButton, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
@@ -352,17 +353,66 @@ function Customer({ order: o, busy, act }) {
 // ----------------------------------------------------------------- shipping
 
 function Shipping({ order: o, busy, act }) {
+  const toast = useToast();
   const [courier, setCourier] = useState(o.courier || "");
   const [tracking, setTracking] = useState(o.tracking_number || "");
+  const [booking, setBooking] = useState(false);
   useEffect(() => {
     setCourier(o.courier || "");
     setTracking(o.tracking_number || "");
   }, [o.courier, o.tracking_number]);
   const dirty = courier !== (o.courier || "") || tracking !== (o.tracking_number || "");
+  const withPostEx = o.courier === "PostEx" && o.tracking_number;
+  const canBook = !o.tracking_number && (o.status === "confirmed" || o.status === "packed");
+
+  if (withPostEx) {
+    return (
+      <section className="adm-card">
+        <h2>Shipping</h2>
+        <p className="adm-strong">PostEx · {o.tracking_number}</p>
+        <p className="adm-sub">
+          {o.courier_status || "Booked"}
+          {o.courier_city ? ` · ${o.courier_city}` : ""}
+          {o.courier_status_at ? ` · checked ${timeAgo(o.courier_status_at)}` : ""}
+        </p>
+        <div className="adm-btns">
+          <button
+            className="adm-btn"
+            onClick={() =>
+              openPdf(() => api.postexPdf("awb", [o.id]), `postex-${o.tracking_number}`).catch((e) => toast(e.message, "err"))
+            }
+          >
+            Airway bill
+          </button>
+          {(o.status === "confirmed" || o.status === "packed") && (
+            <ConfirmButton
+              disabled={busy}
+              confirmLabel="Yes, cancel at PostEx"
+              onConfirm={() => act(() => api.postexCancel(o.id), "PostEx booking cancelled")}
+            >
+              Cancel booking
+            </ConfirmButton>
+          )}
+        </div>
+        <p className="adm-hint">Sync on the Orders page moves this order on as PostEx picks it up and delivers it.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="adm-card">
       <h2>Shipping</h2>
+      {canBook && (
+        <>
+          <button className="adm-btn primary full" disabled={busy} onClick={() => setBooking(true)}>
+            Book with PostEx
+          </button>
+          <p className="adm-hint adm-or">or add another courier's tracking:</p>
+        </>
+      )}
+      {booking && (
+        <BookingSheet ids={[o.id]} onClose={() => setBooking(false)} onBooked={() => act(async () => {})} />
+      )}
       <label className="adm-field">
         <span>Courier</span>
         <input list="adm-couriers-side" value={courier} onChange={(e) => setCourier(e.target.value)} />

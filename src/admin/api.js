@@ -81,7 +81,8 @@ export async function getLiveVisitors() {
 // ----------------------------------------------------------------- orders
 
 const ORDER_LIST_COLS =
-  "id,order_number,status,payment_status,customer_name,phone,city,total,created_at,order_items(quantity)";
+  "id,order_number,status,payment_status,customer_name,phone,city,total,created_at," +
+  "courier,tracking_number,courier_status,order_items(quantity)";
 
 export async function listOrders({ status, search, limit = 50, offset = 0 } = {}) {
   if (!sb) return (await demo()).listOrders({ status, search, limit, offset });
@@ -150,6 +151,55 @@ export async function addOrderNote(id, message) {
   if (!sb) return (await demo()).addOrderNote(id, message);
   unwrap(await sb.from("order_events").insert({ order_id: id, kind: "note", message }));
 }
+
+// Everything the PostEx booking sheet shows for the chosen orders.
+const BOOKING_COLS =
+  "id,order_number,status,payment_status,customer_name,phone,address,city,postal_code,customer_note,total," +
+  "courier,tracking_number,order_items(title,size,quantity)";
+
+export async function ordersForBooking(ids) {
+  if (!sb) return (await demo()).ordersForBooking(ids);
+  const rows = unwrap(await sb.from("orders").select(BOOKING_COLS).in("id", ids));
+  return ids.map((id) => rows.find((o) => o.id === id)).filter(Boolean);
+}
+
+// ----------------------------------------------------------------- PostEx
+// Every PostEx call goes through api/postex.js, which holds the merchant
+// token; the admin's session proves who's asking.
+
+async function postex(action, payload) {
+  if (!sb) return (await demo()).postex(action, payload);
+  const token = (await getSession())?.access_token;
+  let res;
+  try {
+    res = await fetch(`/api/postex?action=${action}`, {
+      method: payload ? "POST" : "GET",
+      headers: { Authorization: `Bearer ${token}`, ...(payload ? { "Content-Type": "application/json" } : {}) },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+  } catch {
+    throw new ApiError("Couldn't reach the server. Check your connection and try again.");
+  }
+  const type = res.headers.get("content-type") || "";
+  if (res.ok && type.includes("pdf")) return res.blob();
+  const data = type.includes("json") ? await res.json().catch(() => null) : null;
+  if (!res.ok || !data) {
+    throw new ApiError(
+      data?.error || (res.status === 404 ? "PostEx works on the live site only." : `PostEx request failed (${res.status}).`)
+    );
+  }
+  return data;
+}
+
+// → { cities: [...names], addresses: [{ code, city, address, isDefault }], learned: { INPUT: city } }
+export const postexSetup = () => postex("setup");
+// orders: [{ id, city? }] → { results: [{ id, order_number, ok, linked, tracking, city, note, error, skipped }] }
+export const postexBook = (orders, pickupCode) => postex("book", { orders, pickupCode });
+// → { checked, linked: [...], moved: [...], attention: [...], syncedAt }
+export const postexSync = () => postex("sync", {});
+export const postexCancel = (id) => postex("cancel", { id });
+// kind: "awb" (airway bills) or "loadsheet"; at most 10 orders → PDF Blob
+export const postexPdf = (kind, ids) => postex(kind, { ids });
 
 export async function deleteOrder(id) {
   if (!sb) return (await demo()).deleteOrder(id);

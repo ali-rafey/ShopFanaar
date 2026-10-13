@@ -30,9 +30,9 @@ no Shopify dependency at runtime:
    fires `Purchase`, and the same Purchase goes to Meta from the server
    (Conversions API, see below).
 4. The order appears instantly in `/admin` (live feed + tab badge). The admin
-   confirms (WhatsApp button pre-fills a confirmation message), packs, adds the
-   courier + tracking number, ships, and marks delivered / paid. Every step is
-   logged on the order's timeline.
+   confirms (WhatsApp button pre-fills a confirmation message), books it with
+   PostEx (or adds another courier's tracking number), and marks it paid once
+   the courier remits. Every step is logged on the order's timeline.
 5. Cancelling or returning puts the units back in stock automatically (once).
 
 ## Local development
@@ -110,6 +110,33 @@ auto-detects Vite (`npm run build`, output `dist`).
 - **Fonts:** Bodoni Moda + Inter, self-hosted in `public/fonts`.
 - **Meta Pixel:** `src/lib/pixel.js` — PageView, ViewContent, AddToCart,
   InitiateCheckout, Purchase. Not loaded on admin pages.
+
+## PostEx (courier)
+
+Orders are booked with PostEx from the admin: select confirmed or packed
+orders (or open one) → **Book with PostEx**. The booking sheet shows the
+amount PostEx will collect and PostEx's own name for each delivery city;
+anything it can't match for certain (typos, "DHA Phase 5 Lahore") has to be
+picked by hand, and the correction is remembered for next time. Booked
+orders get the tracking number and move to Packed. **Sync PostEx** (also run
+automatically when the Orders page opens, at most every 10 minutes) moves
+them to Shipped once PostEx picks them up and to Delivered on delivery, and
+links bookings made by hand in the PostEx portal to their orders by order
+number. Returns and PostEx-side cancellations are only reported — restocking
+stays a manual decision. Airway bills (10 per PDF) and load sheets print from
+the selection bar or the order page.
+
+All PostEx calls run in `api/postex.js` (client in `server/postex.js`, city
+matching in `src/lib/courierCity.js`, database side in
+`supabase/migrations/*_courier_postex.sql`). It never books an order twice:
+each order is locked in the database while its booking is in flight, and
+PostEx is searched for an existing booking with the same order number first.
+
+- **Vercel env (type "Secret"):** `POSTEX_API_TOKEN` — the merchant API token
+  from the PostEx portal.
+- PostEx's guide (v4.1.9) is out of date in places; `server/postex.js` lists
+  what the live API actually expects.
+- Errors appear in Vercel → Logs, prefixed `postex:`.
 
 ## Meta Conversions API (server-side Purchase)
 

@@ -5,6 +5,7 @@
 // (see loadDemo in ./api.js).
 import { products as P, collections as C, defaultSizeChart } from "../data/store";
 import { ApiError } from "./api";
+import { canonicalCity, cityIndex, normCity, resolveCity } from "./courierCity";
 
 const DB_KEY = "fanaar-demo-db-v1";
 const SESSION_KEY = "fanaar-demo-session";
@@ -437,6 +438,94 @@ export function updateOrder(id, patch) {
     }
     Object.assign(o, patch, { updated_at: now() });
     return o;
+  });
+}
+
+// ------------------------------------------------------------------ PostEx
+// A stand-in for api/postex.js with the same checks and outcomes, but fake
+// tracking numbers — nothing leaves the browser.
+
+const DEMO_CITIES = [
+  "Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad", "MULTAN", "PESHAWAR", "SIALKOT",
+  "SARGODHA", "GUJRANWALA", "HYDERABAD", "QUETTA", "BAHAWALPUR", "LAHORE CANTT", "KARACHI CITY",
+  "DERA GHAZI KHAN", "RAHIM YAR KHAN", "SHEIKHUPURA", "GUJRAT", "SAHIWAL", "ABBOTTABAD", "MURREE",
+  "T.T SINGH", "WAH CANTT", "OKARA", "KASUR", "JHELUM", "MARDAN", "SUKKUR", "LARKANA",
+];
+
+export function ordersForBooking(ids) {
+  return tx((d) =>
+    ids
+      .map((id) => d.orders.find((o) => o.id === id))
+      .filter(Boolean)
+      .map((o) => ({ ...o, order_items: d.items.filter((i) => i.order_id === o.id) }))
+  );
+}
+
+function demoStatus(d, o, status, note) {
+  o.status = status;
+  o.updated_at = now();
+  addEvent(d, o.id, "status", status, note);
+}
+
+export function postex(action, payload = {}) {
+  return tx((d) => {
+    d.cityAliases ||= {};
+    const index = cityIndex(DEMO_CITIES);
+    if (action === "setup") {
+      return {
+        cities: DEMO_CITIES,
+        addresses: [{ code: "001", city: "Faisalabad", address: "Demo warehouse, Faisalabad", isDefault: true }],
+        learned: d.cityAliases,
+      };
+    }
+    if (action === "book") {
+      const results = payload.orders.map(({ id, city: chosen }) => {
+        const o = d.orders.find((x) => x.id === id);
+        const r = { id, order_number: o?.order_number ?? null };
+        if (!o) return { ...r, error: "Order not found." };
+        if (o.tracking_number) return { ...r, skipped: true, error: `Already booked (${o.courier} ${o.tracking_number}).` };
+        if (!["confirmed", "packed"].includes(o.status)) {
+          return { ...r, skipped: true, error: `It's ${o.status} — only confirmed or packed orders can be booked.` };
+        }
+        const auto = resolveCity(index, o.city, d.cityAliases);
+        const city = chosen ? canonicalCity(index, chosen) : auto.sure ? auto.city : null;
+        if (!city) return { ...r, error: chosen ? `“${chosen}” isn't a PostEx city.` : `Choose the PostEx city for “${o.city}”.` };
+        if (!/^03[0-9]{9}$/.test(o.phone)) return { ...r, error: `The phone number ${o.phone} isn't a Pakistani mobile (03xx…).` };
+        const tracking = "2339" + String(Math.floor(Math.random() * 1e10)).padStart(10, "0");
+        Object.assign(o, {
+          courier: "PostEx", tracking_number: tracking, courier_city: city,
+          courier_status: "Unbooked", courier_status_at: now(), courier_booked_at: now(),
+        });
+        addEvent(d, id, "shipping", null, `PostEx ${tracking}`);
+        if (o.status === "confirmed") demoStatus(d, o, "packed", "Booked with PostEx");
+        if (chosen && !(auto.sure && auto.city === city)) d.cityAliases[normCity(o.city)] = city;
+        return { ...r, ok: true, tracking, city };
+      });
+      return { results };
+    }
+    if (action === "sync") {
+      // Demo parcels move one step per sync: packed → picked up → delivered.
+      const out = { checked: 0, linked: [], moved: [], attention: [], syncedAt: now() };
+      for (const o of d.orders.filter((x) => x.courier === "PostEx" && x.tracking_number)) {
+        if (!["packed", "shipped"].includes(o.status)) continue;
+        out.checked += 1;
+        const to = o.status === "packed" ? "shipped" : "delivered";
+        o.courier_status = to === "shipped" ? "In Stock" : "Delivered";
+        o.courier_status_at = now();
+        out.moved.push({ id: o.id, order_number: o.order_number, from: o.status, to });
+        demoStatus(d, o, to, to === "shipped" ? "Picked up by PostEx" : "PostEx: delivered");
+      }
+      return out;
+    }
+    if (action === "cancel") {
+      const o = d.orders.find((x) => x.id === payload.id);
+      if (!o?.tracking_number) fail("This order has no PostEx booking.");
+      addEvent(d, o.id, "shipping", null, `PostEx booking ${o.tracking_number} cancelled`);
+      Object.assign(o, { courier: null, tracking_number: null, courier_city: null, courier_status: null, courier_booked_at: null });
+      if (o.status === "packed") demoStatus(d, o, "confirmed", "Ready to book again");
+      return { ok: true };
+    }
+    fail("Airway bills and load sheets come from PostEx — try them on the live site.");
   });
 }
 
