@@ -5,7 +5,7 @@ import * as api from "../api";
 import { ALL_STATUSES, nextStatus, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
 import {
-  ConfirmButton, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
+  ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
 } from "../ui";
 
@@ -369,10 +369,12 @@ function Shipping({ order: o, busy, act }) {
     return (
       <section className="adm-card">
         <h2>Shipping</h2>
-        <p className="adm-strong">PostEx · {o.tracking_number}</p>
+        <p className="adm-courier-head">
+          <CourierStatus courier="PostEx" status={o.courier_status} />
+        </p>
+        <p className="adm-strong">{o.tracking_number}</p>
         <p className="adm-sub">
-          {o.courier_status || "Booked"}
-          {o.courier_city ? ` · ${o.courier_city}` : ""}
+          {o.courier_city ? `To ${o.courier_city}` : "PostEx"}
           {o.courier_status_at ? ` · checked ${timeAgo(o.courier_status_at)}` : ""}
         </p>
         <div className="adm-btns">

@@ -2081,15 +2081,6 @@ textarea.adm-input {
   font-size: 13px;
   white-space: nowrap;
 }
-.adm-courier-status {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: #eef3ef;
-  color: #1f6b48;
-  font-size: 11.5px;
-}
 .adm-btn-note {
   margin-left: 7px;
   font-size: 11.5px;
@@ -2386,10 +2377,6 @@ textarea.adm-input {
   .adm-cells li.is-selected .adm-cell {
     background: #f1f1ee;
   }
-  .adm-cell-all {
-    min-height: 50px !important;
-    font-weight: 500;
-  }
   .adm-tick {
     flex: none;
     width: 22px;
@@ -2403,35 +2390,7 @@ textarea.adm-input {
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E")
       center / 14px no-repeat;
   }
-  .adm-courier-line {
-    color: #1f6b48;
-  }
 
-  .adm-bulkbar {
-    left: 0;
-    bottom: calc(60px + env(safe-area-inset-bottom));
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: 14px 14px 0 0;
-  }
-  .adm-bulkbar:not(.show) {
-    transform: translateY(calc(100% + 80px));
-  }
-  .adm-bulkbar .adm-btns {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .adm-bulkbar .adm-btn,
-  .adm-bulkbar .adm-status-select.adm-input {
-    min-height: 40px;
-    font-size: 15px;
-  }
-  .adm-bulk-spacer {
-    height: 110px;
-  }
 
   /* The sheet slides up from the bottom, full width */
   .adm-sheet-wrap {
@@ -2468,5 +2427,297 @@ textarea.adm-input {
   .adm-orders td {
     padding-left: 12px;
     padding-right: 12px;
+  }
+}
+
+/* ------------------------------------------- courier (PostEx) status */
+/* The colour says what to do: green done, blue moving, teal out for
+   delivery today, amber waiting for pickup, red needs a look, grey closed. */
+.adm-courier {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.adm-courier::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+.adm-tone-delivered { background: #e2f3e6; color: #22663a; }
+.adm-tone-moving { background: #e4edfb; color: #1f4f8f; }
+.adm-tone-out { background: #dcf1f5; color: #0d6378; }
+.adm-tone-waiting { background: #fdf1d6; color: #7a5300; }
+.adm-tone-attention { background: #fbe6e3; color: #a33a2b; }
+.adm-tone-closed { background: #eeeeec; color: #5c5c5c; }
+.adm-courier-head {
+  margin: 0 0 8px;
+}
+
+/* ------------------------------------------------ iOS action sheet */
+.adm-action-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 8px calc(8px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.32);
+  animation: adm-fade 0.15s ease;
+}
+.adm-action {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  animation: adm-rise 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.adm-action-group {
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(250, 250, 248, 0.95);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+.adm-action-head {
+  display: grid;
+  gap: 3px;
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+.adm-action-head strong {
+  font-weight: 600;
+}
+.adm-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-top: 0.5px solid rgba(0, 0, 0, 0.13);
+  background: none;
+  font: inherit;
+  font-size: 19px;
+  color: var(--a-ink);
+  cursor: pointer;
+}
+.adm-action-group > .adm-action-btn:first-child {
+  border-top: 0;
+}
+.adm-action-btn.is-destructive {
+  color: #e5352b;
+}
+.adm-action-btn:active,
+.adm-action-cancel:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+.adm-action .adm-action-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.adm-action-cancel {
+  min-height: 56px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--a-ink);
+  cursor: pointer;
+}
+@keyframes adm-rise {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes adm-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes adm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-action,
+  .adm-action-wrap {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------- orders on iPhone */
+.adm-ptr,
+.adm-navbtn {
+  display: none;
+}
+@media (max-width: 860px) {
+  /* Top-bar buttons, like Select / Done in Mail */
+  .adm-pagehead-actions {
+    gap: 2px;
+  }
+  .adm-navbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 6px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--a-ink);
+    cursor: pointer;
+  }
+  .adm-navbtn:disabled {
+    opacity: 1;
+  }
+  .adm-navbtn.is-busy svg {
+    animation: adm-spin 0.9s linear infinite;
+  }
+
+  /* Search field with a magnifier, like iOS */
+  .adm-search {
+    padding-left: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L20 20'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 11px 50%;
+    background-size: 16px;
+  }
+
+  /* Day groups */
+  .adm-section-label {
+    margin: 20px 4px 7px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--a-muted);
+  }
+  .adm-day-list section:first-of-type .adm-section-label {
+    margin-top: 6px;
+  }
+  .adm-day-list .adm-cells {
+    margin-bottom: 0;
+  }
+  .adm-cell-side {
+    align-self: flex-start;
+    padding-top: 1px;
+  }
+  .adm-cell-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .adm-cell-tags .adm-badge,
+  .adm-cell-tags .adm-courier {
+    font-size: 12px;
+  }
+  .adm-select-all {
+    display: block;
+    margin: 0 0 2px auto;
+    padding: 6px 4px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--a-ink);
+  }
+  .adm-list-foot {
+    margin: 18px 0 6px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--a-muted);
+  }
+
+  /* Pull to refresh */
+  .adm-ptr {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 8px);
+    left: 50%;
+    z-index: 45;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.14);
+    color: var(--a-ink);
+    opacity: 0;
+    transform: translate(-50%, -44px);
+    pointer-events: none;
+  }
+  .adm-ptr.is-refreshing {
+    opacity: 1 !important;
+    transform: translate(-50%, 12px) !important;
+    transition: transform 0.2s ease;
+  }
+  .adm-ptr.is-refreshing svg {
+    animation: adm-spin 0.8s linear infinite;
+  }
+
+  /* Selecting: a toolbar takes the tab bar's place */
+  .adm-selecting .adm-tabbar {
+    display: none;
+  }
+  .adm-selbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(249, 249, 247, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-top: 0.5px solid rgba(0, 0, 0, 0.14);
+  }
+  .adm-selbar button {
+    flex: 1;
+    min-height: 44px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--a-ink);
+  }
+  .adm-selbar button:disabled {
+    color: #b9b9b4;
+  }
+  .adm-selbar-note {
+    flex: 1;
+    min-height: 44px;
+    line-height: 44px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--a-ink-2);
+  }
+  .adm-selbar-spacer {
+    height: 64px;
   }
 }

@@ -44,6 +44,31 @@ export function PayBadge({ status }) {
   return <span className={`adm-badge p-${status}`}>{PAY[status] || status}</span>;
 }
 
+// What a courier's own status means for the admin, by its wording (PostEx
+// renames and adds statuses, so this matches patterns rather than a list):
+//   delivered — done              attention — attempted, under review, returning
+//   moving    — in PostEx's hands   out       — out for delivery today
+//   waiting   — booked, not picked up yet     closed — cancelled / expired
+export function courierTone(status) {
+  const s = String(status || "").toLowerCase();
+  if (!s) return "waiting";
+  if (/^delivered$/.test(s)) return "delivered";
+  if (/attempt|review|return|refused|un-?assigned/.test(s)) return "attention";
+  if (/cancel|expire/.test(s)) return "closed";
+  if (/out for delivery/.test(s)) return "out";
+  if (/^(un)?booked$/.test(s)) return "waiting";
+  return "moving";
+}
+
+export function CourierStatus({ courier, status }) {
+  return (
+    <span className={`adm-courier adm-tone-${courierTone(status)}`}>
+      {courier}
+      {status ? ` · ${status}` : " · Booked"}
+    </span>
+  );
+}
+
 const PRODUCT_STATUS = { active: "Active", draft: "Draft", archived: "Archived" };
 export function ProductStatusBadge({ status }) {
   return <span className={`adm-badge ps-${status}`}>{PRODUCT_STATUS[status]}</span>;
@@ -83,6 +108,50 @@ export function ErrorBox({ error, onRetry }) {
           Try again
         </button>
       )}
+    </div>
+  );
+}
+
+// An iOS-style action sheet: a stack of choices rising from the bottom, with
+// Cancel set apart. actions: [{ label, onClick, destructive?, dot? }] — dot is
+// a badge class (e.g. "s-packed") shown as a coloured dot.
+export function ActionSheet({ title, message, actions, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    document.documentElement.classList.add("adm-sheet-open");
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.documentElement.classList.remove("adm-sheet-open");
+    };
+  }, [onClose]);
+  return (
+    <div className="adm-action-wrap" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="adm-action" role="dialog" aria-modal="true" aria-label={title || "Actions"}>
+        <div className="adm-action-group">
+          {(title || message) && (
+            <div className="adm-action-head">
+              {title && <strong>{title}</strong>}
+              {message && <span>{message}</span>}
+            </div>
+          )}
+          {actions.map((a) => (
+            <button
+              key={a.label}
+              type="button"
+              className={`adm-action-btn ${a.destructive ? "is-destructive" : ""}`}
+              onClick={a.onClick}
+              disabled={a.disabled}
+            >
+              {a.dot && <span className={`adm-action-dot ${a.dot}`} aria-hidden="true" />}
+              {a.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="adm-action-cancel" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

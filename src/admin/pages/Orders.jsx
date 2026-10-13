@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ALL_STATUSES, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
-import { ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner, StatusBadge, timeAgo, useLoad, useToast } from "../ui";
+import {
+  ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
+  StatusBadge, timeAgo, useLoad, useToast,
+} from "../ui";
 
 const PAGE = 50;
 const SYNC_KEY = "fanaar-postex-synced";
@@ -13,6 +16,10 @@ const PDF_MAX = 10;
 // Statuses that put items back in stock — always confirmed first.
 const RESTOCKS = new Set(["cancelled", "returned"]);
 
+// Phones: the list is grouped by day and uses iOS patterns — Select / Done in
+// the bar, pull down to refresh, a toolbar and action sheets while selecting.
+// Computers: the table, with checkboxes, a status picker per row and the
+// dark selection bar.
 export default function Orders() {
   const { stats, version, refreshStats } = useFeed();
   const navigate = useNavigate();
@@ -24,7 +31,8 @@ export default function Orders() {
   const [limit, setLimit] = useState(PAGE);
   const [selected, setSelected] = useState(() => new Set());
   const [selecting, setSelecting] = useState(false); // phone: tap to select instead of open
-  const [confirm, setConfirm] = useState(null); // { ids, status } awaiting "yes"
+  const [confirm, setConfirm] = useState(null); // computer: { ids, status } awaiting "yes"
+  const [sheet, setSheet] = useState(null); // phone: "status" | "print" | { restock: status }
   const [working, setWorking] = useState(null); // label while a bulk action runs
   const [booking, setBooking] = useState(null); // order ids in the PostEx sheet
   const [sync, setSync] = useState({ busy: false, at: readSyncedAt(), attention: [] });
@@ -47,11 +55,19 @@ export default function Orders() {
     setSelected(new Set());
   }, [status, q]);
 
+  // While selecting on a phone the toolbar takes the tab bar's place.
+  useEffect(() => {
+    document.documentElement.classList.toggle("adm-selecting", selecting);
+    return () => document.documentElement.classList.remove("adm-selecting");
+  }, [selecting]);
+
   const list = useLoad(() => api.listOrders({ status, search: q, limit }), [status, q, limit, version]);
   const by = stats?.by_status || {};
   const total = Object.values(by).reduce((n, x) => n + x, 0);
   const rows = useMemo(() => list.data?.rows || [], [list.data]);
   const chosen = rows.filter((o) => selected.has(o.id));
+  const bookedChosen = chosen.filter((o) => o.courier === "PostEx" && o.tracking_number);
+  const days = useMemo(() => byDay(rows), [rows]);
 
   const setStatus = (s) => {
     const next = new URLSearchParams(params);
@@ -72,6 +88,7 @@ export default function Orders() {
     setSelected(new Set());
     setSelecting(false);
     setConfirm(null);
+    setSheet(null);
   };
 
   const refresh = useCallback(() => {
@@ -82,6 +99,7 @@ export default function Orders() {
   // ---------------------------------------------------------- status change
   async function applyStatus(ids, next) {
     setConfirm(null);
+    setSheet(null);
     setWorking(`Updating ${ids.length} ${ids.length === 1 ? "order" : "orders"}…`);
     const failed = [];
     for (const id of ids) {
@@ -97,7 +115,8 @@ export default function Orders() {
     const done = ids.length - failed.length;
     if (failed.length) toast(`${done} updated · ${failed.join(" · ")}`, "err");
     else toast(`${done} ${done === 1 ? "order" : "orders"} marked ${STATUS[next].label.toLowerCase()}`);
-    if (ids.length > 1) setSelected(new Set());
+    if (selecting) clearSelection();
+    else if (ids.length > 1) setSelected(new Set());
     refresh();
   }
   const requestStatus = (ids, next) => {
@@ -140,30 +159,64 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const bookedChosen = chosen.filter((o) => o.courier === "PostEx" && o.tracking_number);
+  const pull = usePullToRefresh(async () => {
+    await Promise.all([list.reload(), runSync(true)]);
+    refreshStats();
+  });
+
   async function pdf(kind) {
+    setSheet(null);
     if (!bookedChosen.length) return toast("None of the selected orders is booked with PostEx yet.", "err");
     const max = kind === "awb" ? PDF_MAX : 50;
     if (bookedChosen.length > max) return toast(`Select at most ${max} booked orders at a time.`, "err");
     try {
-      await openPdf(() => api.postexPdf(kind, bookedChosen.map((o) => o.id)), kind === "awb" ? "postex-airway-bills" : "postex-load-sheet");
+      await openPdf(
+        () => api.postexPdf(kind, bookedChosen.map((o) => o.id)),
+        kind === "awb" ? "postex-airway-bills" : "postex-load-sheet"
+      );
     } catch (err) {
       toast(err.message, "err");
     }
   }
 
-  const onRow = (o) => (selecting ? toggle(o.id) : navigate(`/admin/orders/${o.id}`));
+  const ids = chosen.map((o) => o.id);
+  const what = ids.length === 1 ? `#${chosen[0].order_number}` : `${ids.length} orders`;
+  const title = selecting ? (chosen.length ? `${chosen.length} Selected` : "Select Orders") : "Orders";
 
   return (
     <>
+      <div ref={pull.indicator} className={`adm-ptr ${pull.refreshing ? "is-refreshing" : ""}`} aria-hidden="true">
+        <SyncIcon />
+      </div>
+
       <PageHead
-        title="Orders"
+        title={title}
         sub={`${total} orders in total`}
         actions={
-          <button className="adm-btn" onClick={() => runSync(false)} disabled={sync.busy}>
-            {sync.busy ? "Syncing…" : "Sync PostEx"}
-            {sync.at && !sync.busy && <small className="adm-btn-note">{timeAgo(new Date(sync.at).toISOString())}</small>}
-          </button>
+          <>
+            <button className="adm-btn adm-only-desktop" onClick={() => runSync(false)} disabled={sync.busy}>
+              {sync.busy ? "Syncing…" : "Sync PostEx"}
+              {sync.at && !sync.busy && <small className="adm-btn-note">{timeAgo(new Date(sync.at).toISOString())}</small>}
+            </button>
+            {!selecting && (
+              <button
+                className={`adm-navbtn adm-only-mobile-inline ${sync.busy ? "is-busy" : ""}`}
+                onClick={() => runSync(false)}
+                disabled={sync.busy}
+                aria-label="Sync with PostEx"
+              >
+                <SyncIcon />
+              </button>
+            )}
+            {rows.length > 0 && (
+              <button
+                className="adm-navbtn adm-only-mobile-inline"
+                onClick={() => (selecting ? clearSelection() : setSelecting(true))}
+              >
+                {selecting ? "Done" : "Select"}
+              </button>
+            )}
+          </>
         }
       />
 
@@ -211,15 +264,7 @@ export default function Orders() {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search orders"
         />
-        {rows.length > 0 && (
-          <button
-            className={`adm-btn adm-only-mobile-inline ${selecting ? "primary" : ""}`}
-            onClick={() => (selecting ? clearSelection() : setSelecting(true))}
-          >
-            {selecting ? "Done" : "Select"}
-          </button>
-        )}
-        {(status === "confirmed" || status === "packed") && rows.some((o) => !o.tracking_number) && (
+        {(status === "confirmed" || status === "packed") && rows.some((o) => !o.tracking_number) && !selecting && (
           <button
             className="adm-btn primary"
             onClick={() => setBooking(rows.filter((o) => !o.tracking_number).map((o) => o.id))}
@@ -238,57 +283,37 @@ export default function Orders() {
         </p>
       ) : (
         <>
-          <ul className={`adm-cells adm-only-mobile ${selecting ? "is-selecting" : ""}`}>
+          {/* ---------------- phone: grouped by day, like Mail */}
+          <div className="adm-only-mobile adm-day-list">
             {selecting && (
-              <li>
-                <button className="adm-cell adm-cell-all" onClick={toggleAll}>
-                  <span className={`adm-tick ${allOnPage ? "on" : ""}`} aria-hidden="true" />
-                  {allOnPage ? "Deselect all" : `Select all ${rows.length}`}
-                </button>
-              </li>
+              <button className="adm-select-all" onClick={toggleAll}>
+                {allOnPage ? "Deselect All" : `Select All ${rows.length}`}
+              </button>
             )}
-            {rows.map((o) => {
-              const units = o.order_items.reduce((n, i) => n + i.quantity, 0);
-              const body = (
-                <>
-                  {selecting && <span className={`adm-tick ${selected.has(o.id) ? "on" : ""}`} aria-hidden="true" />}
-                  <span className="adm-cell-main">
-                    <span className="adm-cell-title">
-                      <strong>#{o.order_number}</strong> {o.customer_name}
-                    </span>
-                    <span className="adm-cell-sub">
-                      {o.city} · {units} {units === 1 ? "item" : "items"} · {timeAgo(o.created_at)}
-                    </span>
-                    {o.tracking_number && (
-                      <span className="adm-cell-sub adm-courier-line">
-                        {o.courier}
-                        {o.courier_status ? ` · ${o.courier_status}` : ""}
-                      </span>
-                    )}
-                  </span>
-                  <span className="adm-cell-side">
-                    <span className="adm-cell-amount">{money(o.total)}</span>
-                    <StatusBadge status={o.status} />
-                  </span>
-                  {!selecting && <span className="adm-chevron" aria-hidden="true" />}
-                </>
-              );
-              return (
-                <li key={o.id} className={selected.has(o.id) ? "is-selected" : ""}>
-                  {selecting ? (
-                    <button className="adm-cell" onClick={() => toggle(o.id)} aria-pressed={selected.has(o.id)}>
-                      {body}
-                    </button>
-                  ) : (
-                    <Link to={`/admin/orders/${o.id}`} className="adm-cell">
-                      {body}
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+            {days.map((d) => (
+              <section key={d.label}>
+                <h3 className="adm-section-label">{d.label}</h3>
+                <ul className="adm-cells">
+                  {d.rows.map((o) => (
+                    <OrderCell
+                      key={o.id}
+                      order={o}
+                      selecting={selecting}
+                      selected={selected.has(o.id)}
+                      onToggle={() => toggle(o.id)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {sync.at && (
+              <p className="adm-list-foot">
+                PostEx checked {timeAgo(new Date(sync.at).toISOString())} · pull down to refresh
+              </p>
+            )}
+          </div>
 
+          {/* ---------------- computer: the table */}
           <div className="adm-card flush adm-only-desktop adm-scroll-x">
             <table className="adm-table adm-orders">
               <thead>
@@ -308,7 +333,7 @@ export default function Orders() {
               </thead>
               <tbody>
                 {rows.map((o) => (
-                  <tr key={o.id} className={selected.has(o.id) ? "is-selected" : ""} onClick={() => onRow(o)}>
+                  <tr key={o.id} className={selected.has(o.id) ? "is-selected" : ""} onClick={() => navigate(`/admin/orders/${o.id}`)}>
                     <td className="adm-check-col" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -342,7 +367,14 @@ export default function Orders() {
                       />
                     </td>
                     <td data-label="Shipping" className="adm-courier-cell">
-                      {o.tracking_number ? courierLine(o) : <span className="muted">—</span>}
+                      {o.tracking_number ? (
+                        <>
+                          <CourierStatus courier={o.courier} status={o.courier_status} />
+                          <small className="muted block">{o.tracking_number}</small>
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -360,8 +392,13 @@ export default function Orders() {
         </div>
       )}
 
-      {(chosen.length > 0 || confirm) && <div className="adm-bulk-spacer" aria-hidden="true" />}
-      <div className={`adm-bulkbar ${chosen.length || confirm ? "show" : ""}`} role="region" aria-label="Selected orders">
+      {/* ---------------- computer: dark selection bar */}
+      {(chosen.length > 0 || confirm) && <div className="adm-bulk-spacer adm-only-desktop" aria-hidden="true" />}
+      <div
+        className={`adm-bulkbar adm-only-desktop ${chosen.length || confirm ? "show" : ""}`}
+        role="region"
+        aria-label="Selected orders"
+      >
         {confirm ? (
           <>
             <span>
@@ -394,10 +431,10 @@ export default function Orders() {
             <div className="adm-btns">
               <StatusSelect
                 placeholder="Set status…"
-                onChange={(next) => requestStatus(chosen.map((o) => o.id), next)}
+                onChange={(next) => requestStatus(ids, next)}
                 label="Set status of the selected orders"
               />
-              <button className="adm-btn primary" onClick={() => setBooking(chosen.map((o) => o.id))}>
+              <button className="adm-btn primary" onClick={() => setBooking(ids)}>
                 Book with PostEx
               </button>
               {bookedChosen.length > 0 && (
@@ -415,17 +452,220 @@ export default function Orders() {
         )}
       </div>
 
+      {/* ---------------- phone: toolbar + action sheets while selecting */}
+      {selecting && (
+        <>
+          <div className="adm-selbar-spacer adm-only-mobile" aria-hidden="true" />
+          <div className="adm-selbar adm-only-mobile" role="toolbar" aria-label="Selected orders">
+            {working ? (
+              <span className="adm-selbar-note">{working}</span>
+            ) : (
+              <>
+                <button disabled={!chosen.length} onClick={() => setSheet("status")}>
+                  Status
+                </button>
+                <button disabled={!chosen.length} onClick={() => setBooking(ids)}>
+                  Book PostEx
+                </button>
+                <button disabled={!bookedChosen.length} onClick={() => setSheet("print")}>
+                  Print
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {sheet === "status" && (
+        <ActionSheet
+          title={`Change status of ${what}`}
+          onClose={() => setSheet(null)}
+          actions={ALL_STATUSES.map((s) => ({
+            label: STATUS[s].label,
+            dot: `s-${s}`,
+            destructive: RESTOCKS.has(s),
+            onClick: () => (RESTOCKS.has(s) ? setSheet({ restock: s }) : applyStatus(ids, s)),
+          }))}
+        />
+      )}
+      {sheet?.restock && (
+        <ActionSheet
+          title={`Mark ${what} ${STATUS[sheet.restock].label.toLowerCase()}?`}
+          message="Their items go back in stock."
+          onClose={() => setSheet(null)}
+          actions={[
+            {
+              label: `Mark ${STATUS[sheet.restock].label.toLowerCase()}`,
+              destructive: true,
+              onClick: () => applyStatus(ids, sheet.restock),
+            },
+          ]}
+        />
+      )}
+      {sheet === "print" && (
+        <ActionSheet
+          title={`Print for ${bookedChosen.length} PostEx ${bookedChosen.length === 1 ? "parcel" : "parcels"}`}
+          onClose={() => setSheet(null)}
+          actions={[
+            { label: "Airway bills", onClick: () => pdf("awb") },
+            { label: "Load sheet", onClick: () => pdf("loadsheet") },
+          ]}
+        />
+      )}
+
       {booking && (
         <BookingSheet
           ids={booking}
           onClose={() => setBooking(null)}
           onBooked={() => {
-            setSelected(new Set());
+            clearSelection();
             refresh();
           }}
         />
       )}
     </>
+  );
+}
+
+function OrderCell({ order: o, selecting, selected, onToggle }) {
+  const units = o.order_items.reduce((n, i) => n + i.quantity, 0);
+  const body = (
+    <>
+      {selecting && <span className={`adm-tick ${selected ? "on" : ""}`} aria-hidden="true" />}
+      <span className="adm-cell-main">
+        <span className="adm-cell-title">
+          <strong>#{o.order_number}</strong> {o.customer_name}
+        </span>
+        <span className="adm-cell-sub">
+          {o.city} · {units} {units === 1 ? "item" : "items"} · {clock(o.created_at)}
+        </span>
+        <span className="adm-cell-tags">
+          <StatusBadge status={o.status} />
+          {o.tracking_number && <CourierStatus courier={o.courier} status={o.courier_status} />}
+        </span>
+      </span>
+      <span className="adm-cell-side">
+        <span className="adm-cell-amount">{money(o.total)}</span>
+      </span>
+      {!selecting && <span className="adm-chevron" aria-hidden="true" />}
+    </>
+  );
+  return (
+    <li className={selected ? "is-selected" : ""}>
+      {selecting ? (
+        <button className="adm-cell" onClick={onToggle} aria-pressed={selected}>
+          {body}
+        </button>
+      ) : (
+        <Link to={`/admin/orders/${o.id}`} className="adm-cell">
+          {body}
+        </Link>
+      )}
+    </li>
+  );
+}
+
+// "Today", "Yesterday", a weekday this week, then the date — newest first.
+function byDay(rows) {
+  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = midnight(new Date());
+  const out = [];
+  for (const o of rows) {
+    const at = new Date(o.created_at);
+    const ago = Math.round((today - midnight(at)) / 864e5);
+    const label =
+      ago === 0
+        ? "Today"
+        : ago === 1
+          ? "Yesterday"
+          : ago < 7
+            ? at.toLocaleDateString("en-PK", { weekday: "long" })
+            : at.toLocaleDateString("en-PK", { day: "numeric", month: "long" });
+    const last = out[out.length - 1];
+    if (last?.label === label) last.rows.push(o);
+    else out.push({ label, rows: [o] });
+  }
+  return out;
+}
+
+const clock = (iso) => new Date(iso).toLocaleTimeString("en-PK", { hour: "numeric", minute: "2-digit" });
+
+// Pull the list down from the top to refresh (phones). The indicator is moved
+// directly rather than through state, so dragging doesn't re-render the list.
+function usePullToRefresh(onRefresh) {
+  const indicator = useRef(null);
+  const latest = useRef(onRefresh);
+  latest.current = onRefresh;
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!("ontouchstart" in window) || !window.matchMedia("(max-width: 860px)").matches) return undefined;
+    const TRIGGER = 64;
+    let startY = null;
+    let pulled = 0;
+    const show = (px) => {
+      const el = indicator.current;
+      if (!el) return;
+      el.style.transform = `translate(-50%, ${px - 44}px)`;
+      el.style.opacity = String(Math.min(1, px / TRIGGER));
+      el.firstChild.style.transform = `rotate(${px * 4}deg)`;
+    };
+    const start = (e) => {
+      startY = window.scrollY <= 0 && e.touches.length === 1 && !document.querySelector(".adm-sheet-open") ? e.touches[0].clientY : null;
+      pulled = 0;
+    };
+    const move = (e) => {
+      if (startY == null) return;
+      if (window.scrollY > 0) {
+        startY = null;
+        show(0);
+        return;
+      }
+      pulled = Math.min(96, Math.max(0, (e.touches[0].clientY - startY) * 0.5));
+      show(pulled);
+    };
+    const end = async () => {
+      if (startY == null) return;
+      const go = pulled >= TRIGGER;
+      startY = null;
+      pulled = 0;
+      show(0);
+      if (!go) return;
+      if (navigator.vibrate) navigator.vibrate(10);
+      setRefreshing(true);
+      try {
+        await latest.current();
+      } finally {
+        setRefreshing(false);
+      }
+    };
+    window.addEventListener("touchstart", start, { passive: true });
+    window.addEventListener("touchmove", move, { passive: true });
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchcancel", end);
+    return () => {
+      window.removeEventListener("touchstart", start);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", end);
+      window.removeEventListener("touchcancel", end);
+    };
+  }, []);
+
+  return { indicator, refreshing };
+}
+
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        d="M20 11a8 8 0 0 0-14.3-4.9M4 5v4h4M4 13a8 8 0 0 0 14.3 4.9M20 19v-4h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -437,14 +677,7 @@ function readSyncedAt() {
   }
 }
 
-const courierLine = (o) => (
-  <>
-    {o.courier} {o.courier_status && <span className="adm-courier-status">{o.courier_status}</span>}
-    <small className="muted block">{o.tracking_number}</small>
-  </>
-);
-
-// A status picker that looks like the status badge.
+// A status picker that looks like the status badge (computers).
 function StatusSelect({ status, onChange, disabled, label, placeholder }) {
   return (
     <select
