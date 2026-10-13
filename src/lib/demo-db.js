@@ -179,6 +179,30 @@ export async function placeOrder(payload) {
   return result;
 }
 
+export function trackOrders(phone) {
+  return tx((d) => {
+    const digits = String(phone || "").replace(/\D/g, "").replace(/^(0092|92|0)/, "");
+    if (!/^3\d{9}$/.test(digits)) fail("Please enter the mobile number you ordered with, e.g. 0300 1234567.");
+    const since = Date.now() - 180 * 864e5;
+    return d.orders
+      .filter((o) => o.phone === "0" + digits && Date.parse(o.created_at) > since)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, 10)
+      .map((o) => ({
+        order_number: o.order_number,
+        status: o.status,
+        created_at: o.created_at,
+        total: o.total,
+        payment_status: o.payment_status,
+        courier: o.courier || null,
+        tracking_number: o.tracking_number || null,
+        items: d.items
+          .filter((i) => i.order_id === o.id)
+          .map((i) => ({ title: i.title, handle: i.handle, size: i.size, image: i.image, quantity: i.quantity })),
+      }));
+  });
+}
+
 export function getOrderPublic(id) {
   return tx((d) => {
     const o = d.orders.find((x) => x.id === id);

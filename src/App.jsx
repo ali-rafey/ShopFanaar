@@ -13,6 +13,7 @@ import About from "./pages/About";
 import Saved from "./pages/Saved";
 import Checkout from "./pages/Checkout";
 import OrderStatus from "./pages/OrderStatus";
+import TrackOrder from "./pages/TrackOrder";
 import Contact from "./pages/Contact";
 import { Shipping, Returns, Privacy } from "./pages/Policies";
 import NotFound from "./pages/NotFound";
@@ -66,6 +67,7 @@ function Storefront() {
           <Route path="/saved" element={<Saved />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order/:id" element={<OrderStatus />} />
+          <Route path="/track" element={<TrackOrder />} />
           <Route path="/pages/contact" element={<Contact />} />
           <Route path="/policies/shipping-policy" element={<Shipping />} />
           <Route path="/policies/refund-policy" element={<Returns />} />
@@ -75,6 +77,7 @@ function Storefront() {
           <Route path="/shipping" element={<Navigate to="/policies/shipping-policy" replace />} />
           <Route path="/returns" element={<Navigate to="/policies/refund-policy" replace />} />
           <Route path="/privacy" element={<Navigate to="/policies/privacy-policy" replace />} />
+          <Route path="/track-order" element={<Navigate to="/track" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

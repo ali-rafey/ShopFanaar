@@ -128,6 +128,11 @@ export function Privacy() {
             details and isn&apos;t shared with anyone.
           </li>
           <li>
+            <strong>When you track an order:</strong> the number you enter is only used to find
+            your orders. To stop misuse, we keep a scrambled (one-way) code of your connection
+            for a day — not your IP address itself.
+          </li>
+          <li>
             <strong>On your device:</strong> your cart, saved pieces and (if you choose) your
             checkout details are stored in your own browser so they&apos;re there next time. We
             don&apos;t see these until you place an order.

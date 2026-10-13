@@ -118,6 +118,14 @@ export async function fetchOrder(id) {
   return rest("rpc/get_order_public", { p_id: id });
 }
 
+// "Track your order": recent orders for the mobile number they were placed
+// with — status, items and tracking only (see *_track_orders.sql).
+export async function trackOrders(phone) {
+  if (BACKEND === "static") throw new ApiError("Order tracking isn't available yet.");
+  if (BACKEND === "demo") return (await loadDemo()).trackOrders(phone);
+  return rest("rpc/track_orders", { p_phone: phone });
+}
+
 // Newsletter. Resolves "subscribed" or "already".
 export async function subscribe(email) {
   if (BACKEND === "static") throw new ApiError("Sign-ups aren't available yet.");

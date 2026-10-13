@@ -28,6 +28,20 @@ function IconHeart() {
   );
 }
 
+function IconTrack() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+      <path
+        d="M3 6.5h11v10H3zM14 10h4l3 3.5v3H14M6.5 19a1.8 1.8 0 1 0 0-.1M17.5 19a1.8 1.8 0 1 0 0-.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function IconBag() {
   return (
     <svg className="icon-svg" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
@@ -170,6 +184,10 @@ export default function Header() {
           </Link>
 
           <div className="header-actions">
+            <Link to="/track" className="icon-btn" aria-label="Track your order">
+              <IconTrack />
+              <span className="icon-label">Track</span>
+            </Link>
             <Link
               to="/saved"
               className="icon-btn"
@@ -297,6 +315,14 @@ export default function Header() {
               }}
             >
               Saved{savedCount > 0 ? ` (${savedCount})` : ""}
+            </Link>
+            <Link
+              to="/track"
+              style={{
+                transitionDelay: `${0.05 + (SHOP_LINKS.length + 3) * 0.035}s`,
+              }}
+            >
+              Track your order
             </Link>
           </nav>
           <SocialIcons className="overlay-foot" size={32} />

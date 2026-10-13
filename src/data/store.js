@@ -31,6 +31,7 @@ export const shop = {
 // Footer "Information" links + the tabs across the info pages. Paths match
 // the old Shopify URLs so existing links and search results keep working.
 export const infoPages = [
+  { to: "/track", label: "Track your order" },
   { to: "/pages/contact", label: "Contact" },
   { to: "/policies/shipping-policy", label: "Shipping" },
   { to: "/policies/refund-policy", label: "Returns" },
