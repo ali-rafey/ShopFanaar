@@ -110,7 +110,8 @@ export function progress(row) {
     status,
     cancelled,
     delivered,
-    returning: /return/.test(s),
+    returned: s === "returned", // back with us — final
+    returning: /return/.test(s), // on its way back, or back
     pickedUp: delivered || (!cancelled && Boolean(row.orderPickupDate)),
   };
 }

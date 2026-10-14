@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
-import { ALL_STATUSES, STATUS } from "../../lib/orderStatus";
+import { ADMIN_STATUSES, ALL_STATUSES, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
 import {
-  ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
+  ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, SourceTag, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
 } from "../ui";
 
@@ -15,6 +15,8 @@ const AUTO_SYNC_MS = 10 * 60e3;
 const PDF_MAX = 10;
 // Statuses that put items back in stock — always confirmed first.
 const RESTOCKS = new Set(["cancelled", "returned"]);
+// Booked with PostEx: from here on the status comes from PostEx.
+const withPostEx = (o) => Boolean(o.tracking_number);
 
 // Phones: one list, newest first, with iOS patterns — Select / Done in the
 // bar, pull down to refresh, a toolbar and action sheets while selecting.
@@ -34,7 +36,7 @@ export default function Orders() {
   const [confirm, setConfirm] = useState(null); // computer: { ids, status } awaiting "yes"
   const [sheet, setSheet] = useState(null); // phone: "status" | "print" | { restock: status }
   const [working, setWorking] = useState(null); // label while a bulk action runs
-  const [booking, setBooking] = useState(null); // order ids in the PostEx sheet
+  const [booking, setBooking] = useState(null); // { ids, auto } for the PostEx sheet
   const [sync, setSync] = useState({ busy: false, at: readSyncedAt(), attention: [] });
 
   // Debounce the search box into the URL (so Back keeps the filter).
@@ -97,27 +99,42 @@ export default function Orders() {
   }, [list, refreshStats]);
 
   // ---------------------------------------------------------- status change
+  // The admin sets Pending, Confirmed or Cancelled. Confirming books the
+  // orders with PostEx straight away; cancelling a booked parcel cancels it at
+  // PostEx too (only possible before pickup). Everything else comes from PostEx.
   async function applyStatus(ids, next) {
     setConfirm(null);
     setSheet(null);
     setWorking(`Updating ${ids.length} ${ids.length === 1 ? "order" : "orders"}…`);
     const failed = [];
+    const changed = [];
     for (const id of ids) {
       const o = rows.find((x) => x.id === id);
       if (!o || o.status === next) continue;
       try {
+        if (withPostEx(o)) {
+          if (next !== "cancelled" || o.status !== "packed") {
+            throw new Error(
+              o.status === "packed"
+                ? "it's booked with PostEx — its status now comes from PostEx"
+                : "it's already with PostEx, so it can't be changed here"
+            );
+          }
+          await api.postexCancel(id); // not picked up yet: cancel the booking first
+        }
         await api.setOrderStatus(id, next, ids.length > 1 ? "Changed in bulk" : null);
+        changed.push(o);
       } catch (err) {
         failed.push(`#${o.order_number}: ${err.message}`);
       }
     }
     setWorking(null);
-    const done = ids.length - failed.length;
-    if (failed.length) toast(`${done} updated · ${failed.join(" · ")}`, "err");
-    else toast(`${done} ${done === 1 ? "order" : "orders"} marked ${STATUS[next].label.toLowerCase()}`);
+    if (failed.length) toast(`${changed.length} updated · ${failed.join(" · ")}`, "err");
+    else if (changed.length) toast(`${changed.length} ${changed.length === 1 ? "order" : "orders"} marked ${STATUS[next].label.toLowerCase()}`);
     if (selecting) clearSelection();
     else if (ids.length > 1) setSelected(new Set());
     refresh();
+    if (next === "confirmed" && changed.length) setBooking({ ids: changed.map((o) => o.id), auto: true });
   }
   const requestStatus = (ids, next) => {
     if (!next || !ids.length) return;
@@ -267,7 +284,7 @@ export default function Orders() {
         {(status === "confirmed" || status === "packed") && rows.some((o) => !o.tracking_number) && !selecting && (
           <button
             className="adm-btn primary"
-            onClick={() => setBooking(rows.filter((o) => !o.tracking_number).map((o) => o.id))}
+            onClick={() => setBooking({ ids: rows.filter((o) => !o.tracking_number).map((o) => o.id) })}
           >
             Book all with PostEx
           </button>
@@ -323,7 +340,7 @@ export default function Orders() {
                   <th className="num">Total</th>
                   <th>Payment</th>
                   <th>Status</th>
-                  <th>Shipping</th>
+                  <th>Tracking</th>
                 </tr>
               </thead>
               <tbody>
@@ -342,6 +359,7 @@ export default function Orders() {
                         <strong>#{o.order_number}</strong>
                       </Link>
                       <small className="muted block">{fmtDate(o.created_at)}</small>
+                      <SourceTag source={o.source} />
                     </td>
                     <td data-label="Customer">
                       {o.customer_name}
@@ -354,22 +372,19 @@ export default function Orders() {
                     <td data-label="Total" className="num">{money(o.total)}</td>
                     <td data-label="Payment"><PayBadge status={o.payment_status} /></td>
                     <td data-label="Status" onClick={(e) => e.stopPropagation()}>
-                      <StatusSelect
-                        status={o.status}
-                        disabled={Boolean(working)}
-                        onChange={(next) => requestStatus([o.id], next)}
-                        label={`Status of order ${o.order_number}`}
-                      />
-                    </td>
-                    <td data-label="Shipping" className="adm-courier-cell">
-                      {o.tracking_number ? (
-                        <>
-                          <CourierStatus courier={o.courier} status={o.courier_status} />
-                          <small className="muted block">{o.tracking_number}</small>
-                        </>
+                      {withPostEx(o) ? (
+                        <CourierStatus courier={o.courier} status={o.courier_status} />
                       ) : (
-                        <span className="muted">—</span>
+                        <StatusSelect
+                          status={o.status}
+                          disabled={Boolean(working)}
+                          onChange={(next) => requestStatus([o.id], next)}
+                          label={`Status of order ${o.order_number}`}
+                        />
                       )}
+                    </td>
+                    <td data-label="Tracking" className="adm-courier-cell">
+                      {o.tracking_number || <span className="muted">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -402,7 +417,10 @@ export default function Orders() {
                 ? `#${rows.find((o) => o.id === confirm.ids[0])?.order_number}`
                 : `${confirm.ids.length} orders`}{" "}
               {STATUS[confirm.status].label.toLowerCase()}?
-              <small>Items go back in stock.</small>
+              <small>
+                Items go back in stock
+                {rows.some((o) => confirm.ids.includes(o.id) && withPostEx(o)) ? "; booked parcels are cancelled at PostEx" : ""}.
+              </small>
             </span>
             <div className="adm-btns">
               <button className="adm-btn" onClick={() => setConfirm(null)}>
@@ -429,7 +447,7 @@ export default function Orders() {
                 onChange={(next) => requestStatus(ids, next)}
                 label="Set status of the selected orders"
               />
-              <button className="adm-btn primary" onClick={() => setBooking(ids)}>
+              <button className="adm-btn primary" onClick={() => setBooking({ ids })}>
                 Book with PostEx
               </button>
               {bookedChosen.length > 0 && (
@@ -459,7 +477,7 @@ export default function Orders() {
                 <button disabled={!chosen.length} onClick={() => setSheet("status")}>
                   Status
                 </button>
-                <button disabled={!chosen.length} onClick={() => setBooking(ids)}>
+                <button disabled={!chosen.length} onClick={() => setBooking({ ids })}>
                   Book PostEx
                 </button>
                 <button disabled={!bookedChosen.length} onClick={() => setSheet("print")}>
@@ -474,9 +492,15 @@ export default function Orders() {
       {sheet === "status" && (
         <ActionSheet
           title={`Change status of ${what}`}
+          message="After confirming, the status comes from PostEx."
           onClose={() => setSheet(null)}
-          actions={ALL_STATUSES.map((s) => ({
-            label: STATUS[s].label,
+          actions={ADMIN_STATUSES.map((s) => ({
+            label:
+              s === "confirmed"
+                ? "Confirm & book with PostEx"
+                : s === "cancelled"
+                  ? ids.length === 1 ? "Cancel order" : "Cancel orders"
+                  : `Back to ${STATUS[s].label.toLowerCase()}`,
             dot: `s-${s}`,
             destructive: RESTOCKS.has(s),
             onClick: () => (RESTOCKS.has(s) ? setSheet({ restock: s }) : applyStatus(ids, s)),
@@ -486,7 +510,11 @@ export default function Orders() {
       {sheet?.restock && (
         <ActionSheet
           title={`Mark ${what} ${STATUS[sheet.restock].label.toLowerCase()}?`}
-          message="Their items go back in stock."
+          message={
+            chosen.some(withPostEx)
+              ? "Their items go back in stock, and parcels not yet picked up are cancelled at PostEx."
+              : "Their items go back in stock."
+          }
           onClose={() => setSheet(null)}
           actions={[
             {
@@ -510,7 +538,8 @@ export default function Orders() {
 
       {booking && (
         <BookingSheet
-          ids={booking}
+          ids={booking.ids}
+          autoBook={booking.auto}
           onClose={() => setBooking(null)}
           onBooked={() => {
             clearSelection();
@@ -535,8 +564,8 @@ function OrderCell({ order: o, selecting, selected, onToggle }) {
           {o.city} · {units} {units === 1 ? "item" : "items"} · {timeAgo(o.created_at)}
         </span>
         <span className="adm-cell-tags">
-          <StatusBadge status={o.status} />
-          {o.tracking_number && <CourierStatus courier={o.courier} status={o.courier_status} />}
+          {withPostEx(o) ? <CourierStatus courier={o.courier} status={o.courier_status} /> : <StatusBadge status={o.status} />}
+          <SourceTag source={o.source} />
         </span>
       </span>
       <span className="adm-cell-side">
@@ -647,8 +676,10 @@ function readSyncedAt() {
   }
 }
 
-// A status picker that looks like the status badge (computers).
+// A status picker that looks like the status badge (computers). Offers the
+// admin's own statuses; choosing Confirmed books the order with PostEx.
 function StatusSelect({ status, onChange, disabled, label, placeholder }) {
+  const options = status && !ADMIN_STATUSES.includes(status) ? [status, ...ADMIN_STATUSES] : ADMIN_STATUSES;
   return (
     <select
       className={`adm-status-select ${status ? `adm-badge s-${status}` : "adm-input"}`}
@@ -662,9 +693,9 @@ function StatusSelect({ status, onChange, disabled, label, placeholder }) {
           {placeholder}
         </option>
       )}
-      {ALL_STATUSES.map((s) => (
-        <option key={s} value={s}>
-          {STATUS[s].label}
+      {options.map((s) => (
+        <option key={s} value={s} disabled={!ADMIN_STATUSES.includes(s)}>
+          {s === "confirmed" && status !== "confirmed" ? "Confirm & book" : STATUS[s].label}
         </option>
       ))}
     </select>

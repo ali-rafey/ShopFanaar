@@ -125,7 +125,8 @@ export function Privacy() {
             (for example from Instagram), your device type, how many items are in your cart and
             your approximate city, which our hosting provider estimates from your connection
             (we don&apos;t store your IP address). It isn&apos;t linked to your name or contact
-            details and isn&apos;t shared with anyone.
+            details and isn&apos;t shared with anyone. When you order, how you found us (for example
+            which of our ads you clicked) is saved with the order.
           </li>
           <li>
             <strong>When you track an order:</strong> the number you enter is only used to find

@@ -118,6 +118,14 @@ export async function fetchOrder(id) {
   return rest("rpc/get_order_public", { p_id: id });
 }
 
+// How the shopper found us (lib/attribution.js), saved with their new order
+// for the admin. Fire-and-forget: it never holds up the order.
+export function saveOrderSource(orderId, source) {
+  if (!source || BACKEND === "static") return Promise.resolve();
+  if (BACKEND === "demo") return loadDemo().then((d) => d.setOrderSource(orderId, source)).catch(() => {});
+  return rest("rpc/set_order_source", { p_order_id: orderId, p_source: source }).catch(() => {});
+}
+
 // "Track your order": recent orders for the mobile number they were placed
 // with — status, items and tracking only (see *_track_orders.sql).
 export async function trackOrders(phone) {

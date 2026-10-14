@@ -82,7 +82,7 @@ export async function getLiveVisitors() {
 
 const ORDER_LIST_COLS =
   "id,order_number,status,payment_status,customer_name,phone,city,total,created_at," +
-  "courier,tracking_number,courier_status,order_items(quantity)";
+  "courier,tracking_number,courier_status,source,order_items(quantity)";
 
 export async function listOrders({ status, search, limit = 50, offset = 0 } = {}) {
   if (!sb) return (await demo()).listOrders({ status, search, limit, offset });

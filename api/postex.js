@@ -91,18 +91,41 @@ function linkNote(order, row) {
   );
 }
 
+// The cash PostEx collects for a parcel, as a whole number of rupees.
+function amountOf(row) {
+  const n = Math.round(Number(row.invoicePayment));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// PostEx times are Pakistan time; add the zone when PostEx leaves it off.
+function pakistanTime(value) {
+  if (!value) return null;
+  const s = String(value);
+  const t = Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}+05:00`);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
+// Bring an order in line with its PostEx parcel: PostEx's status, the cash it
+// collects, its delivery date, and — once PostEx has returned the parcel to
+// us — the return itself (items back in stock). Returns the order's status.
 async function applyProgress(db, order, tracking, row) {
   const p = postex.progress(row);
-  return db("rpc/courier_status_update", {
-    method: "POST",
-    body: {
-      p_order_id: order.id,
-      p_tracking: tracking,
-      p_courier_status: p.status,
-      p_picked_up: p.pickedUp,
-      p_delivered: p.delivered,
-    },
+  const rpc = (fn, body) => db(`rpc/${fn}`, { method: "POST", body });
+  await rpc("courier_details", {
+    p_order_id: order.id,
+    p_tracking: tracking,
+    p_amount: amountOf(row),
+    p_delivered_at: p.delivered ? pakistanTime(row.orderDeliveryDate) : null,
   });
+  const after = await rpc("courier_status_update", {
+    p_order_id: order.id,
+    p_tracking: tracking,
+    p_courier_status: p.status,
+    p_picked_up: p.pickedUp,
+    p_delivered: p.delivered,
+  });
+  if (p.returned) return rpc("courier_returned", { p_order_id: order.id, p_tracking: tracking });
+  return after;
 }
 
 // ------------------------------------------------------------------ actions
@@ -258,6 +281,10 @@ async function book(db, body) {
         continue;
       }
       Object.assign(result, { ok: true, tracking, city });
+      await db("rpc/courier_details", {
+        method: "POST",
+        body: { p_order_id: id, p_tracking: tracking, p_amount: order.payment_status === "paid" ? 0 : order.total },
+      }).catch(() => {}); // Sync fills it in if this fails
 
       // Remember a city the admin had to choose, for next time.
       if (chosenCity[id] && normCity(order.city) && !(auto.sure && auto.city === city)) {
@@ -275,17 +302,24 @@ async function book(db, body) {
   return { results };
 }
 
-// Link portal bookings to their orders and bring every PostEx order's status
-// up to date. Only moves orders forward; returns and courier cancellations
-// are reported for the admin to act on.
+// Link portal bookings to their orders and bring every PostEx order up to
+// date: status, the cash PostEx collects and delivery dates. Orders only move
+// forward, and a parcel PostEx has returned to us marks the order returned
+// (items back in stock). Parcels on their way back and courier cancellations
+// are reported for the admin.
 async function sync(db) {
   const since = new Date(Date.now() - 90 * DAY).toISOString();
   const orders = await db(
-    `orders?select=id,order_number,status,payment_status,total,courier,tracking_number,courier_status,created_at` +
+    `orders?select=id,order_number,status,payment_status,total,courier,tracking_number,courier_status,courier_amount,created_at` +
       `&created_at=gte.${since}&order=order_number.asc`
   );
+  // Parcels still moving, plus delivered ones whose PostEx amount isn't
+  // recorded yet (delivered before amounts were kept) — for the sales figures.
   const tracked = orders.filter(
-    (o) => o.courier === COURIER && o.tracking_number && ["confirmed", "packed", "shipped"].includes(o.status)
+    (o) =>
+      o.courier === COURIER &&
+      o.tracking_number &&
+      (["confirmed", "packed", "shipped"].includes(o.status) || (o.status === "delivered" && o.courier_amount == null))
   );
   const untracked = orders.filter((o) => !o.tracking_number && o.status !== "pending");
   const relevant = [...tracked, ...untracked];
@@ -300,8 +334,12 @@ async function sync(db) {
     const p = postex.progress(row);
     const after = await applyProgress(db, order, tracking, row);
     if (after && after !== order.status) out.moved.push({ id: order.id, order_number: order.order_number, from: order.status, to: after });
-    if (p.returning) {
-      out.attention.push({ id: order.id, order_number: order.order_number, message: `PostEx says “${p.status}”. Mark it returned when the parcel is back.` });
+    if (p.returning && !p.returned) {
+      out.attention.push({
+        id: order.id,
+        order_number: order.order_number,
+        message: `PostEx says “${p.status}” — it's on its way back. It'll be marked returned (and restocked) once it reaches you.`,
+      });
     } else if (p.cancelled) {
       out.attention.push({ id: order.id, order_number: order.order_number, message: "The PostEx booking was cancelled — book it again or cancel the order." });
     }
@@ -313,7 +351,8 @@ async function sync(db) {
     // Nothing new from PostEx and nothing to move: skip the database round trip.
     const p = postex.progress(row);
     const moves = (p.delivered && order.status !== "delivered") || (p.pickedUp && order.status !== "shipped");
-    if (p.status === order.courier_status && !moves && !p.returning && !p.cancelled) continue;
+    const newAmount = amountOf(row) !== null && amountOf(row) !== order.courier_amount;
+    if (p.status === order.courier_status && !moves && !newAmount && !p.returning && !p.cancelled) continue;
     await report(order, order.tracking_number, row);
   }
 

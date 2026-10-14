@@ -2709,3 +2709,89 @@ textarea.adm-input {
     height: 64px;
   }
 }
+
+/* Order page: status that comes from PostEx */
+.adm-from-courier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--a-ink-2);
+}
+.adm-from-courier .adm-courier {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+/* Where an order came from */
+.adm-source {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: #eeeeec;
+  color: #4a4a4a;
+}
+.adm-source-meta { background: #e7ecfb; color: #2b4aa0; }
+.adm-source-ad { background: #fdf1d6; color: #7a5300; }
+.adm-source-organic { background: #e7f3ea; color: #24663c; }
+.adm-orders td .adm-source {
+  margin-top: 4px;
+}
+.adm-source-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+}
+.adm-source-card summary::-webkit-details-marker {
+  display: none;
+}
+.adm-source-card summary h2 {
+  margin: 0;
+}
+.adm-source-card summary::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-right: 1.5px solid var(--a-muted);
+  border-bottom: 1.5px solid var(--a-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+}
+.adm-source-card[open] summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+.adm-source-card summary .adm-source {
+  margin-left: auto;
+}
+.adm-source-card[open] summary {
+  margin-bottom: 12px;
+}
+.adm-source-rows {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.adm-source-rows div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+}
+.adm-source-rows dt {
+  color: var(--a-muted);
+}
+.adm-source-rows dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

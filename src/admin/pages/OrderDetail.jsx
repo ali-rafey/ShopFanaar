@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useFeed } from "../AdminApp";
 import * as api from "../api";
-import { ALL_STATUSES, nextStatus, STATUS } from "../../lib/orderStatus";
+import { ALL_STATUSES, FLOW, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
 import { thumb } from "../../lib/catalog";
 import {
-  ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
+  ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, isMetaPlatform, money, PageHead, PayBadge, SourceTag, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
 } from "../ui";
 
@@ -103,6 +103,7 @@ export default function OrderDetail() {
 
         <div className="adm-detail-side">
           <Customer order={o} busy={busy} act={act} />
+          <OrderSource order={o} />
           <Shipping order={o} busy={busy} act={act} />
 
           <section className="adm-card">
@@ -136,28 +137,32 @@ export default function OrderDetail() {
 // ------------------------------------------------------------- status panel
 
 function StatusPanel({ order: o, busy, act, onDeleted }) {
-  const next = nextStatus(o.status);
   const closed = o.status === "cancelled" || o.status === "returned";
+  const booked = Boolean(o.tracking_number);
   const [note, setNote] = useState("");
-  const [courier, setCourier] = useState(o.courier || "");
-  const [tracking, setTracking] = useState(o.tracking_number || "");
   const [manual, setManual] = useState(o.status);
   const [restock, setRestock] = useState(true);
+  const [booking, setBooking] = useState(null); // { auto } while the PostEx sheet is open
 
-  useEffect(() => {
-    setManual(o.status);
-    setCourier(o.courier || "");
-    setTracking(o.tracking_number || "");
-  }, [o.status, o.courier, o.tracking_number]);
+  useEffect(() => setManual(o.status), [o.status]);
 
   const move = (status, opts = {}) =>
     act(async () => {
-      if (status === "shipped" && (courier !== (o.courier || "") || tracking !== (o.tracking_number || ""))) {
-        await api.updateOrder(o.id, { courier: courier || null, tracking_number: tracking.trim() || null });
-      }
       await api.setOrderStatus(o.id, status, note, opts.restock ?? true);
       setNote("");
     }, `Order marked ${STATUS[status].label.toLowerCase()}`);
+
+  // Confirming books the order with PostEx straight away.
+  const confirmAndBook = async () => {
+    if (await move("confirmed")) setBooking({ auto: true });
+  };
+  // A booked parcel PostEx hasn't picked up can still be cancelled — there too.
+  const cancelOrder = () =>
+    act(async () => {
+      if (booked) await api.postexCancel(o.id);
+      await api.setOrderStatus(o.id, "cancelled", note, true);
+      setNote("");
+    }, booked ? "Cancelled here and at PostEx" : "Order cancelled");
 
   return (
     <section className="adm-card adm-status-panel">
@@ -185,30 +190,30 @@ function StatusPanel({ order: o, busy, act, onDeleted }) {
       ) : (
         <>
           <div className="adm-steps" aria-label="Order progress">
-            {["pending", "confirmed", "packed", "shipped", "delivered"].map((s, i, all) => (
+            {FLOW.map((s, i, all) => (
               <span key={s} className={all.indexOf(o.status) >= i ? "done" : ""}>
                 {STATUS[s].label}
               </span>
             ))}
           </div>
 
-          {next === "shipped" && (
-            <div className="adm-row">
-              <label className="adm-field">
-                <span>Courier</span>
-                <input list="adm-couriers" value={courier} onChange={(e) => setCourier(e.target.value)} placeholder="e.g. TCS" />
-                <datalist id="adm-couriers">
-                  {COURIERS.map((c) => <option key={c} value={c} />)}
-                </datalist>
-              </label>
-              <label className="adm-field">
-                <span>Tracking number</span>
-                <input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="Consignment / CN" />
-              </label>
+          {booked ? (
+            <div className="adm-status-row">
+              <p className="adm-from-courier">
+                <CourierStatus courier={o.courier} status={o.courier_status} />
+                <span>
+                  {o.status === "delivered"
+                    ? "Delivered. Mark it paid once PostEx transfers the cash."
+                    : "Status comes from PostEx — Sync on the Orders page keeps it up to date."}
+                </span>
+              </p>
+              {o.status === "packed" && (
+                <ConfirmButton disabled={busy} confirmLabel="Cancel here and at PostEx?" onConfirm={cancelOrder}>
+                  Cancel order
+                </ConfirmButton>
+              )}
             </div>
-          )}
-
-          {next && (
+          ) : (
             <div className="adm-status-row">
               <input
                 className="adm-input grow"
@@ -217,31 +222,26 @@ function StatusPanel({ order: o, busy, act, onDeleted }) {
                 onChange={(e) => setNote(e.target.value)}
               />
               <div className="adm-btns">
-                <button className="adm-btn primary" disabled={busy} onClick={() => move(next)}>
-                  Mark as {STATUS[next].label.toLowerCase()}
-                </button>
-                {o.status === "pending" || o.status === "confirmed" || o.status === "packed" ? (
-                  <ConfirmButton disabled={busy} confirmLabel="Yes, cancel & restock" onConfirm={() => move("cancelled")}>
-                    Cancel order
-                  </ConfirmButton>
-                ) : null}
+                {o.status === "pending" ? (
+                  <button className="adm-btn primary" disabled={busy} onClick={confirmAndBook}>
+                    Confirm &amp; book with PostEx
+                  </button>
+                ) : (
+                  <button className="adm-btn primary" disabled={busy} onClick={() => setBooking({ auto: false })}>
+                    Book with PostEx
+                  </button>
+                )}
+                <ConfirmButton disabled={busy} confirmLabel="Yes, cancel & restock" onConfirm={cancelOrder}>
+                  Cancel order
+                </ConfirmButton>
               </div>
-            </div>
-          )}
-
-          {o.status === "delivered" && (
-            <div className="adm-status-row">
-              <p>Delivered. Mark as paid once the courier remits the cash.</p>
-              <ConfirmButton className="adm-btn" disabled={busy} confirmLabel="Confirm return" onConfirm={() => move("returned", { restock })}>
-                Mark returned
-              </ConfirmButton>
             </div>
           )}
         </>
       )}
 
       <details className="adm-manual">
-        <summary>Change status manually</summary>
+        <summary>Override status (only if PostEx can't)</summary>
         <div className="adm-status-row">
           <select className="adm-input" value={manual} onChange={(e) => setManual(e.target.value)}>
             {ALL_STATUSES.map((s) => (
@@ -259,9 +259,19 @@ function StatusPanel({ order: o, busy, act, onDeleted }) {
           </button>
         </div>
         <p className="adm-hint">
-          Cancelling or returning puts the items back in stock (once). Reopening a cancelled order takes them out again.
+          For orders delivered by hand or merged into another parcel. Cancelling or returning puts the items back
+          in stock (once) unless you untick it.
         </p>
       </details>
+
+      {booking && (
+        <BookingSheet
+          ids={[o.id]}
+          autoBook={booking.auto}
+          onClose={() => setBooking(null)}
+          onBooked={() => act(async () => {})}
+        />
+      )}
     </section>
   );
 }
@@ -351,20 +361,92 @@ function Customer({ order: o, busy, act }) {
   );
 }
 
+// ------------------------------------------------------------------ source
+// Where the order came from (saved at checkout by src/lib/attribution.js).
+
+const ORGANIC = {
+  Instagram: "Instagram — your bio link, a story, a post or a DM (not an ad)",
+  Facebook: "Facebook — a post, your page or a message (not an ad)",
+  Threads: "Threads (not an ad)",
+  WhatsApp: "A link shared on WhatsApp",
+  Google: "Google search",
+  TikTok: "TikTok (not an ad)",
+  Pinterest: "Pinterest",
+  YouTube: "YouTube",
+  "Facebook / Instagram": "Facebook or Instagram — a link without ad tags",
+};
+
+function OrderSource({ order: o }) {
+  const src = o.source;
+  if (!src) {
+    return (
+      <details className="adm-card adm-source-card">
+        <summary>
+          <h2>Where this order came from</h2>
+          <span className="muted">Not recorded</span>
+        </summary>
+        <p className="adm-hint">Sources are saved for orders placed from 15 October 2026 onwards.</p>
+      </details>
+    );
+  }
+
+  const ad = src.kind === "ad";
+  const meta = ad && isMetaPlatform(src.platform);
+  const headline = ad
+    ? `${meta ? "Meta ad" : "Ad"} · ${src.platform}`
+    : src.kind === "organic"
+      ? ORGANIC[src.platform] || `A link on ${src.platform}`
+      : "Direct — typed the address, a bookmark, or a link with no trace";
+  const when = (iso) => (iso ? fmtDate(iso) : null);
+  const daysBefore = (iso) => {
+    if (!iso) return null;
+    const days = Math.floor((Date.parse(o.created_at) - Date.parse(iso)) / 864e5);
+    return days <= 0 ? "same day as the order" : days === 1 ? "1 day before ordering" : `${days} days before ordering`;
+  };
+  const rows = [
+    ad && ["Campaign", src.campaign || (meta ? "Not tagged — add {{campaign.name}} to the ad's URL parameters" : null)],
+    ad && src.adset && ["Ad set", src.adset],
+    ad && src.ad && ["Ad", src.ad],
+    ["Landed on", src.landing],
+    src.referrer && ["Came via", src.referrer],
+    src.touched_at && ["Visit", `${when(src.touched_at)} · ${daysBefore(src.touched_at)}`],
+    src.first_at && [
+      "First found you",
+      `${src.first_kind === "direct" || !src.first_platform ? "Direct" : `${src.first_platform}${src.first_kind === "ad" ? " ad" : ""}`}${src.first_campaign ? ` (${src.first_campaign})` : ""} · ${when(src.first_at)}`,
+    ],
+  ].filter((r) => r && r[1]);
+
+  return (
+    <details className="adm-card adm-source-card">
+      <summary>
+        <h2>Where this order came from</h2>
+        <SourceTag source={src} />
+      </summary>
+      <p className="adm-strong">{headline}</p>
+      <dl className="adm-source-rows">
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 // ----------------------------------------------------------------- shipping
 
 function Shipping({ order: o, busy, act }) {
   const toast = useToast();
   const [courier, setCourier] = useState(o.courier || "");
   const [tracking, setTracking] = useState(o.tracking_number || "");
-  const [booking, setBooking] = useState(false);
   useEffect(() => {
     setCourier(o.courier || "");
     setTracking(o.tracking_number || "");
   }, [o.courier, o.tracking_number]);
   const dirty = courier !== (o.courier || "") || tracking !== (o.tracking_number || "");
   const withPostEx = o.courier === "PostEx" && o.tracking_number;
-  const canBook = !o.tracking_number && (o.status === "confirmed" || o.status === "packed");
 
   if (withPostEx) {
     return (
@@ -405,17 +487,9 @@ function Shipping({ order: o, busy, act }) {
   return (
     <section className="adm-card">
       <h2>Shipping</h2>
-      {canBook && (
-        <>
-          <button className="adm-btn primary full" disabled={busy} onClick={() => setBooking(true)}>
-            Book with PostEx
-          </button>
-          <p className="adm-hint adm-or">or add another courier's tracking:</p>
-        </>
-      )}
-      {booking && (
-        <BookingSheet ids={[o.id]} onClose={() => setBooking(false)} onBooked={() => act(async () => {})} />
-      )}
+      <p className="adm-hint adm-or">
+        Booked with PostEx from the status panel above. Sending it another way? Add that courier&apos;s tracking:
+      </p>
       <label className="adm-field">
         <span>Courier</span>
         <input list="adm-couriers-side" value={courier} onChange={(e) => setCourier(e.target.value)} />

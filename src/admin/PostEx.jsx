@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api";
 import { STATUS } from "../lib/orderStatus";
 import { canonicalCity, cityIndex, resolveCity } from "../lib/courierCity";
@@ -62,7 +62,9 @@ export function Sheet({ title, onClose, children, footer, busy }) {
   );
 }
 
-export function BookingSheet({ ids, onClose, onBooked }) {
+// autoBook: start booking as soon as every order is ready (used right after
+// orders are confirmed); anything that needs a city choice waits for the admin.
+export function BookingSheet({ ids, onClose, onBooked, autoBook = false }) {
   const toast = useToast();
   const res = useLoad(() => Promise.all([api.postexSetup(), api.ordersForBooking(ids)]), [ids.join(",")]);
   const [setup, orders] = res.data || [];
@@ -107,6 +109,15 @@ export function BookingSheet({ ids, onClose, onBooked }) {
   const ready = todo.length > 0 && todo.every((r) => r.city);
   const booked = rows.filter((r) => r.done?.ok);
   const collect = todo.reduce((n, r) => n + r.collect, 0);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoBook && ready && !busy && !autoStarted.current) {
+      autoStarted.current = true;
+      book();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBook, ready, busy]);
 
   async function book() {
     setBusy(true);
@@ -213,8 +224,8 @@ export function BookingSheet({ ids, onClose, onBooked }) {
             ))}
           </ul>
           <p className="adm-hint">
-            Orders already booked in the PostEx portal are linked, not booked again. Booked orders move to Packed;
-            Sync moves them on as PostEx picks them up and delivers.
+            Orders already booked in the PostEx portal are linked, not booked again. Once booked, an order&apos;s
+            status comes from PostEx — Sync keeps it up to date.
           </p>
         </>
       )}

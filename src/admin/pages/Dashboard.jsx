@@ -43,18 +43,29 @@ export default function Dashboard() {
       )}
 
       <section className="adm-tiles" aria-label="Key numbers">
-        <Tile label="Orders to confirm" value={by.pending || 0} to="/admin/orders?status=pending" />
         <Tile
-          label="Ready to ship"
-          value={(by.confirmed || 0) + (by.packed || 0)}
-          note="Confirmed + packed"
+          label="Orders to confirm"
+          value={by.pending || 0}
+          note={`${stats.orders_today} new today`}
+          to="/admin/orders?status=pending"
+        />
+        <Tile
+          label="To book with PostEx"
+          value={stats.to_book ?? by.confirmed ?? 0}
+          note="Confirmed, not booked yet"
           to="/admin/orders?status=confirmed"
         />
-        <Tile label="Orders today" value={stats.orders_today} note={`${compactMoney(stats.revenue_today)} in sales`} />
         <Tile
-          label="Sales, last 30 days"
-          value={compactMoney(stats.revenue_30d)}
-          note={`${stats.orders_30d} ${stats.orders_30d === 1 ? "order" : "orders"} · excl. cancelled & returned`}
+          label="With PostEx"
+          value={stats.with_courier_count ?? 0}
+          note={`${compactMoney(stats.with_courier_amount || 0)} to collect`}
+          to="/admin/orders?status=shipped"
+        />
+        <Tile
+          label="Delivered sales, 30 days"
+          value={compactMoney(stats.delivered_30d_amount || 0)}
+          note={`${stats.delivered_30d_count || 0} ${stats.delivered_30d_count === 1 ? "parcel" : "parcels"} · ${compactMoney(stats.delivered_all_amount || 0)} all time`}
+          to="/admin/orders?status=delivered"
         />
       </section>
 

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useCatalog } from "../context/CatalogContext";
-import { BACKEND, placeOrder } from "../lib/api";
+import { BACKEND, placeOrder, saveOrderSource } from "../lib/api";
+import { orderSource } from "../lib/attribution";
 import { formatPrice, shippingFor, thumb } from "../lib/catalog";
 import { trackInitiateCheckout, trackPurchase } from "../lib/pixel";
 
@@ -108,6 +109,7 @@ export default function Checkout() {
         items: items.map((i) => ({ product_id: i.id, size: i.size, qty: i.qty })),
       });
       trackPurchase(order, form);
+      saveOrderSource(order.id, orderSource());
       try {
         if (remember) {
           localStorage.setItem(

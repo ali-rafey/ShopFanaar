@@ -179,6 +179,13 @@ export async function placeOrder(payload) {
   return result;
 }
 
+export function setOrderSource(id, source) {
+  return tx((d) => {
+    const o = d.orders.find((x) => x.id === id);
+    if (o && !o.source) o.source = source;
+  });
+}
+
 export function trackOrders(phone) {
   return tx((d) => {
     const digits = String(phone || "").replace(/\D/g, "").replace(/^(0092|92|0)/, "");
@@ -343,6 +350,22 @@ export function stats() {
       revenue_today: todays.filter(live).reduce((n, o) => n + o.total, 0),
       orders_30d: recent.length,
       revenue_30d: recent.reduce((n, o) => n + o.total, 0),
+      ...(() => {
+        const amount = (o) => o.courier_amount ?? o.total;
+        const tracked = d.orders.filter((o) => o.tracking_number);
+        const delivered = tracked.filter((o) => o.status === "delivered");
+        const recentDelivered = delivered.filter((o) => new Date(o.courier_delivered_at || o.updated_at) > month);
+        const withCourier = tracked.filter((o) => ["packed", "shipped"].includes(o.status));
+        return {
+          to_book: d.orders.filter((o) => o.status === "confirmed" && !o.tracking_number).length,
+          with_courier_count: withCourier.length,
+          with_courier_amount: withCourier.reduce((n, o) => n + amount(o), 0),
+          delivered_30d_count: recentDelivered.length,
+          delivered_30d_amount: recentDelivered.reduce((n, o) => n + amount(o), 0),
+          delivered_all_count: delivered.length,
+          delivered_all_amount: delivered.reduce((n, o) => n + amount(o), 0),
+        };
+      })(),
       low_stock: d.variants
         .map((v) => ({ v, p: d.products.find((p) => p.id === v.product_id) }))
         .filter(({ v, p }) => p && p.status === "active" && v.stock <= 3)
@@ -519,6 +542,7 @@ export function postex(action, payload = {}) {
         Object.assign(o, {
           courier: "PostEx", tracking_number: tracking, courier_city: city,
           courier_status: "Unbooked", courier_status_at: now(), courier_booked_at: now(),
+          courier_amount: o.payment_status === "paid" ? 0 : o.total,
         });
         addEvent(d, id, "shipping", null, `PostEx ${tracking}`);
         if (o.status === "confirmed") demoStatus(d, o, "packed", "Booked with PostEx");
@@ -536,6 +560,7 @@ export function postex(action, payload = {}) {
         const to = o.status === "packed" ? "shipped" : "delivered";
         o.courier_status = to === "shipped" ? "In Stock" : "Delivered";
         o.courier_status_at = now();
+        if (to === "delivered") o.courier_delivered_at = now();
         out.moved.push({ id: o.id, order_number: o.order_number, from: o.status, to });
         demoStatus(d, o, to, to === "shipped" ? "Picked up by PostEx" : "PostEx: delivered");
       }

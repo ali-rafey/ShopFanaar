@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { initPixel, trackPageView } from "./lib/pixel";
+import { visitTouch } from "./lib/attribution";
 import { CatalogProvider } from "./context/CatalogContext.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { SavedProvider } from "./context/SavedContext.jsx";
@@ -14,6 +15,7 @@ import "./styles.css";
 if (!window.location.pathname.startsWith("/admin")) {
   initPixel();
   trackPageView();
+  visitTouch(); // how this visit arrived — read before the landing URL changes
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(

@@ -69,6 +69,22 @@ export function CourierStatus({ courier, status }) {
   );
 }
 
+// Where an order came from (orders.source, saved at checkout by
+// src/lib/attribution.js), in a few words: "Instagram ad", "Google", "Direct".
+const META = new Set(["Instagram", "Facebook", "Threads", "Messenger", "Audience Network", "Facebook / Instagram"]);
+export const isMetaPlatform = (platform) => META.has(platform);
+export function sourceShort(src) {
+  if (!src) return null;
+  if (src.kind === "direct" || !src.platform) return "Direct";
+  return src.kind === "ad" ? `${src.platform} ad` : src.platform;
+}
+export function SourceTag({ source }) {
+  const short = sourceShort(source);
+  if (!short) return null;
+  const tone = source.kind === "ad" ? (isMetaPlatform(source.platform) ? "meta" : "ad") : source.kind;
+  return <span className={`adm-source adm-source-${tone}`}>{short}</span>;
+}
+
 const PRODUCT_STATUS = { active: "Active", draft: "Draft", archived: "Archived" };
 export function ProductStatusBadge({ status }) {
   return <span className={`adm-badge ps-${status}`}>{PRODUCT_STATUS[status]}</span>;

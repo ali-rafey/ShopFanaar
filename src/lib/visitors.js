@@ -9,10 +9,10 @@
 // number of items in the cart and the approximate city (asked once per visit
 // from api/shop-region.js). No names, IP addresses or contact details.
 import { BACKEND, sendVisit } from "./api";
+import { touchLabel, visitTouch } from "./attribution";
 
 const BEAT_MS = 30_000;
 const ID_KEY = "fanaar-visitor";
-const SOURCE_KEY = "fanaar-visit-source";
 const PLACE_KEY = "fanaar-visit-place";
 const CART_KEY = "fanaar-cart";
 
@@ -113,55 +113,10 @@ function uuid() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-// Worked out once per tab, from the landing page, so browsing around the
-// store doesn't turn an Instagram visit into a "Direct" one.
-let memorySource;
-function visitSource() {
-  try {
-    let s = sessionStorage.getItem(SOURCE_KEY);
-    if (!s) sessionStorage.setItem(SOURCE_KEY, (s = arrivedFrom()));
-    return s;
-  } catch {
-    return (memorySource ??= arrivedFrom());
-  }
-}
-
-const NAMES = [
-  [/instagram|^ig$/, "Instagram"],
-  [/facebook|^fb$|^meta$/, "Facebook"],
-  [/whatsapp|^wa$/, "WhatsApp"],
-  [/tiktok/, "TikTok"],
-  [/pinterest/, "Pinterest"],
-  [/youtube|youtu\.be/, "YouTube"],
-  [/google/, "Google"],
-  [/bing/, "Bing"],
-];
-const named = (s) => NAMES.find(([re]) => re.test(s))?.[1];
-const bare = (host) => host.replace(/^www\./, "");
-
-function arrivedFrom() {
-  const q = new URLSearchParams(window.location.search);
-  const utm = (q.get("utm_source") || "").trim().toLowerCase();
-  const paid = /paid|cpc|ppc|cpm|^ads?$/.test((q.get("utm_medium") || "").toLowerCase()) || q.has("gclid");
-  let ref = "";
-  try {
-    ref = bare(new URL(document.referrer).hostname);
-  } catch {
-    /* no referrer */
-  }
-  if (ref === bare(window.location.hostname)) ref = "";
-  const ua = navigator.userAgent;
-
-  const source =
-    (utm && (named(utm) || utm.charAt(0).toUpperCase() + utm.slice(1))) ||
-    (/Instagram/.test(ua) && "Instagram") || // Instagram's in-app browser
-    (/FBAN|FBAV|FB_IAB/.test(ua) && "Facebook") || // Facebook's in-app browser
-    (ref && (named(ref) || ref)) ||
-    (q.has("fbclid") && "Facebook / Instagram") ||
-    (q.has("gclid") && "Google") ||
-    "Direct";
-  return (paid ? `${source} ad` : source).slice(0, 40);
-}
+// How this visit arrived (e.g. "Instagram ad"), worked out once per tab from
+// the landing page by ./attribution.js — the same logic that records order
+// sources, so the two always agree.
+const visitSource = () => touchLabel(visitTouch()).slice(0, 40);
 
 function deviceType() {
   if (!window.matchMedia("(pointer: coarse)").matches) return "desktop";
