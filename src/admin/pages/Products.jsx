@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import * as api from "../api";
-import { totalStock } from "../../lib/catalog";
+import { thumb, totalStock } from "../../lib/catalog";
 import { ErrorBox, money, PageHead, ProductStatusBadge, Spinner, useLoad } from "../ui";
 
 const FILTERS = [
@@ -77,7 +77,7 @@ export default function Products() {
             return (
               <li key={p.id}>
                 <Link to={`/admin/products/${p.id}`} className="adm-cell">
-                  <span className="adm-thumb">{p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}</span>
+                  <span className="adm-thumb">{p.images[0] && <img src={thumb(p.images[0])} alt="" loading="lazy" />}</span>
                   <span className="adm-cell-main">
                     <span className="adm-cell-title">{p.title}</span>
                     <span className="adm-cell-sub">
@@ -119,7 +119,7 @@ export default function Products() {
                   <tr key={p.id} onClick={() => navigate(`/admin/products/${p.id}`)}>
                     <td data-label="Product">
                       <Link to={`/admin/products/${p.id}`} className="adm-prod" onClick={(e) => e.stopPropagation()}>
-                        <span className="adm-thumb">{p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}</span>
+                        <span className="adm-thumb">{p.images[0] && <img src={thumb(p.images[0])} alt="" loading="lazy" />}</span>
                         <span>
                           {p.title}
                           <small className="muted block">/{p.handle}</small>

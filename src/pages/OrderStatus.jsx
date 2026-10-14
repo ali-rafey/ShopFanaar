@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { fetchOrder } from "../lib/api";
-import { formatPrice } from "../lib/catalog";
+import { formatPrice, thumb } from "../lib/catalog";
 import { FLOW, STATUS } from "../lib/orderStatus";
 
 // Order confirmation + status page. The URL holds the order's private id,
@@ -107,7 +107,7 @@ export default function OrderStatus() {
             {order.items.map((i) => (
               <li key={`${i.title}-${i.size}`} className="co-line">
                 <div className="co-line-img">
-                  {i.image && <img src={i.image} alt="" />}
+                  {i.image && <img src={thumb(i.image)} alt="" />}
                   <span className="co-line-qty">{i.quantity}</span>
                 </div>
                 <div className="co-line-info">

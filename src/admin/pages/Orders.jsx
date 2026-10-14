@@ -16,8 +16,8 @@ const PDF_MAX = 10;
 // Statuses that put items back in stock — always confirmed first.
 const RESTOCKS = new Set(["cancelled", "returned"]);
 
-// Phones: the list is grouped by day and uses iOS patterns — Select / Done in
-// the bar, pull down to refresh, a toolbar and action sheets while selecting.
+// Phones: one list, newest first, with iOS patterns — Select / Done in the
+// bar, pull down to refresh, a toolbar and action sheets while selecting.
 // Computers: the table, with checkboxes, a status picker per row and the
 // dark selection bar.
 export default function Orders() {
@@ -63,11 +63,11 @@ export default function Orders() {
 
   const list = useLoad(() => api.listOrders({ status, search: q, limit }), [status, q, limit, version]);
   const by = stats?.by_status || {};
-  const total = Object.values(by).reduce((n, x) => n + x, 0);
+  // "All" counts everything except cancelled orders, matching the list.
+  const total = Object.entries(by).reduce((n, [s, x]) => (s === "cancelled" ? n : n + x), 0);
   const rows = useMemo(() => list.data?.rows || [], [list.data]);
   const chosen = rows.filter((o) => selected.has(o.id));
   const bookedChosen = chosen.filter((o) => o.courier === "PostEx" && o.tracking_number);
-  const days = useMemo(() => byDay(rows), [rows]);
 
   const setStatus = (s) => {
     const next = new URLSearchParams(params);
@@ -283,29 +283,24 @@ export default function Orders() {
         </p>
       ) : (
         <>
-          {/* ---------------- phone: grouped by day, like Mail */}
-          <div className="adm-only-mobile adm-day-list">
+          {/* ---------------- phone: one list, newest first */}
+          <div className="adm-only-mobile adm-phone-list">
             {selecting && (
               <button className="adm-select-all" onClick={toggleAll}>
                 {allOnPage ? "Deselect All" : `Select All ${rows.length}`}
               </button>
             )}
-            {days.map((d) => (
-              <section key={d.label}>
-                <h3 className="adm-section-label">{d.label}</h3>
-                <ul className="adm-cells">
-                  {d.rows.map((o) => (
-                    <OrderCell
-                      key={o.id}
-                      order={o}
-                      selecting={selecting}
-                      selected={selected.has(o.id)}
-                      onToggle={() => toggle(o.id)}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
+            <ul className="adm-cells">
+              {rows.map((o) => (
+                <OrderCell
+                  key={o.id}
+                  order={o}
+                  selecting={selecting}
+                  selected={selected.has(o.id)}
+                  onToggle={() => toggle(o.id)}
+                />
+              ))}
+            </ul>
             {sync.at && (
               <p className="adm-list-foot">
                 PostEx checked {timeAgo(new Date(sync.at).toISOString())} · pull down to refresh
@@ -537,7 +532,7 @@ function OrderCell({ order: o, selecting, selected, onToggle }) {
           <strong>#{o.order_number}</strong> {o.customer_name}
         </span>
         <span className="adm-cell-sub">
-          {o.city} · {units} {units === 1 ? "item" : "items"} · {clock(o.created_at)}
+          {o.city} · {units} {units === 1 ? "item" : "items"} · {timeAgo(o.created_at)}
         </span>
         <span className="adm-cell-tags">
           <StatusBadge status={o.status} />
@@ -564,31 +559,6 @@ function OrderCell({ order: o, selecting, selected, onToggle }) {
     </li>
   );
 }
-
-// "Today", "Yesterday", a weekday this week, then the date — newest first.
-function byDay(rows) {
-  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const today = midnight(new Date());
-  const out = [];
-  for (const o of rows) {
-    const at = new Date(o.created_at);
-    const ago = Math.round((today - midnight(at)) / 864e5);
-    const label =
-      ago === 0
-        ? "Today"
-        : ago === 1
-          ? "Yesterday"
-          : ago < 7
-            ? at.toLocaleDateString("en-PK", { weekday: "long" })
-            : at.toLocaleDateString("en-PK", { day: "numeric", month: "long" });
-    const last = out[out.length - 1];
-    if (last?.label === label) last.rows.push(o);
-    else out.push({ label, rows: [o] });
-  }
-  return out;
-}
-
-const clock = (iso) => new Date(iso).toLocaleTimeString("en-PK", { hour: "numeric", minute: "2-digit" });
 
 // Pull the list down from the top to refresh (phones). The indicator is moved
 // directly rather than through state, so dragging doesn't re-render the list.

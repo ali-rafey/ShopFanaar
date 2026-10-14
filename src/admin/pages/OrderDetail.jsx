@@ -4,6 +4,7 @@ import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ALL_STATUSES, nextStatus, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
+import { thumb } from "../../lib/catalog";
 import {
   ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
@@ -77,7 +78,7 @@ export default function OrderDetail() {
             <ul className="adm-items">
               {items.map((i) => (
                 <li key={i.id}>
-                  <div className="adm-thumb">{i.image && <img src={i.image} alt="" />}</div>
+                  <div className="adm-thumb">{i.image && <img src={thumb(i.image)} alt="" />}</div>
                   <div className="adm-items-info">
                     {i.product_id ? <Link to={`/admin/products/${i.product_id}`}>{i.title}</Link> : i.title}
                     <small>Size {i.size}</small>

@@ -3,7 +3,7 @@
 // dev-only demo database.
 import { createClient } from "@supabase/supabase-js";
 import { BACKEND, loadDemo, ApiError } from "../lib/api";
-import { toProduct, toSettings } from "../lib/catalog";
+import { thumb, toProduct, toSettings } from "../lib/catalog";
 
 export { BACKEND };
 
@@ -92,7 +92,8 @@ export async function listOrders({ status, search, limit = 50, offset = 0 } = {}
     .select(ORDER_LIST_COLS, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
-  if (status) q = q.eq("status", status);
+  // "All" leaves cancelled orders out — they live under their own tab.
+  q = status ? q.eq("status", status) : q.neq("status", "cancelled");
 
   // Strip characters that have meaning in PostgREST filter syntax.
   const s = (search || "").trim().replace(/^#/, "").replace(/[,()*%\\]/g, " ").trim();
@@ -303,25 +304,31 @@ export async function deleteProduct(product) {
   await removeImages(product.images);
 }
 
-export async function uploadImage(blob, folder = "products") {
-  if (!sb) return (await demo()).uploadImage(blob);
-  const ext = blob.type === "image/webp" ? "webp" : blob.type.split("/")[1] || "jpg";
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  unwrap(
-    await sb.storage.from(BUCKET).upload(path, blob, {
-      contentType: blob.type,
-      cacheControl: "31536000",
-      upsert: false,
-    })
-  );
-  return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+// photo: { large, small } from prepareImage(). Saved as <name>.l.<ext> and
+// <name>.s.<ext>; the product keeps the large URL and the storefront derives
+// the small one with thumb() (src/lib/catalog.js).
+export async function uploadImage(photo, folder = "products") {
+  if (!sb) return (await demo()).uploadImage(photo.large);
+  const ext = photo.large.type === "image/webp" ? "webp" : "jpg";
+  const name = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const put = (path, blob) =>
+    sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
+  unwrap(await put(`${name}.s.${ext}`, photo.small));
+  unwrap(await put(`${name}.l.${ext}`, photo.large));
+  return sb.storage.from(BUCKET).getPublicUrl(`${name}.l.${ext}`).data.publicUrl;
 }
 
-// Best effort: only files in our bucket (not the bundled /images/ set).
+// Best effort: only files in our bucket (not the bundled /images/ set), with
+// the small copy of each photo that has one.
 export async function removeImages(urls = []) {
   if (!sb) return;
   const marker = `/storage/v1/object/public/${BUCKET}/`;
-  const paths = urls.filter((u) => u.includes(marker)).map((u) => u.split(marker)[1]);
+  const paths = urls
+    .filter((u) => u.includes(marker))
+    .flatMap((u) => {
+      const path = u.split(marker)[1];
+      return path === thumb(path) ? [path] : [path, thumb(path)];
+    });
   if (paths.length) await sb.storage.from(BUCKET).remove(paths);
 }
 

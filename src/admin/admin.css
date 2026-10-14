@@ -2603,19 +2603,7 @@ textarea.adm-input {
     background-size: 16px;
   }
 
-  /* Day groups */
-  .adm-section-label {
-    margin: 20px 4px 7px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--a-muted);
-  }
-  .adm-day-list section:first-of-type .adm-section-label {
-    margin-top: 6px;
-  }
-  .adm-day-list .adm-cells {
+  .adm-phone-list .adm-cells {
     margin-bottom: 0;
   }
   .adm-cell-side {

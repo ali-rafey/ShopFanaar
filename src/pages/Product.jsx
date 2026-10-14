@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { shop } from "../data/store";
-import { formatPrice } from "../lib/catalog";
+import { formatPrice, thumb } from "../lib/catalog";
 import { useCatalog } from "../context/CatalogContext";
 import { useCart } from "../context/CartContext";
 import { useSaved } from "../context/SavedContext";
@@ -167,7 +167,7 @@ export default function Product() {
                     title={c.colorName}
                     aria-label={c.colorName}
                   >
-                    <img src={c.images[0]} alt="" aria-hidden="true" />
+                    <img src={thumb(c.images[0])} alt="" aria-hidden="true" />
                   </Link>
                 ))}
               </div>

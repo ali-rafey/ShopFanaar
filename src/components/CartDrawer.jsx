@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { formatPrice } from "../lib/catalog";
+import { formatPrice, thumb } from "../lib/catalog";
 
 export default function CartDrawer() {
   const { items, open, setOpen, updateQty, remove, subtotal } = useCart();
@@ -27,7 +27,7 @@ export default function CartDrawer() {
             items.map((i) => (
               <div className="line" key={i.key}>
                 <Link to={`/products/${i.handle}`} onClick={() => setOpen(false)}>
-                  <img src={i.image} alt={i.title} />
+                  <img src={thumb(i.image)} alt={i.title} />
                 </Link>
                 <div className="line-info">
                   <div className="t">{i.title}</div>

@@ -389,7 +389,7 @@ export function deleteSubscriber(id) {
 export function listOrders({ status, search, limit = 50, offset = 0 } = {}) {
   return tx((d) => {
     let rows = [...d.orders].sort((a, b) => b.created_at.localeCompare(a.created_at));
-    if (status) rows = rows.filter((o) => o.status === status);
+    rows = rows.filter((o) => (status ? o.status === status : o.status !== "cancelled"));
     const q = (search || "").trim().toLowerCase().replace(/^#/, "");
     if (q) {
       rows = rows.filter(

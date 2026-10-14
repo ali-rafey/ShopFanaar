@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
 import { prepareImage } from "../image";
 import { defaultSizeChart } from "../../data/store";
-import { toSizeChart } from "../../lib/catalog";
+import { thumb, toSizeChart } from "../../lib/catalog";
 import { ConfirmButton, ErrorBox, PageHead, Spinner, useLoad, useToast } from "../ui";
 
 const DEFAULT_DISCLAIMER =
@@ -172,8 +172,8 @@ export default function ProductEdit() {
     setUploading((n) => n + list.length);
     for (const file of list) {
       try {
-        const blob = await prepareImage(file);
-        const url = await api.uploadImage(blob, form.handle || "products");
+        const photo = await prepareImage(file);
+        const url = await api.uploadImage(photo, form.handle || "products");
         setForm((f) => ({ ...f, images: [...f.images, url] }));
         setErrors((e) => ({ ...e, images: undefined }));
       } catch (err) {
@@ -287,7 +287,7 @@ export default function ProductEdit() {
             <div className="adm-images">
               {form.images.map((url, i) => (
                 <figure key={url} className="adm-image">
-                  <img src={url} alt={`Photo ${i + 1}`} />
+                  <img src={thumb(url)} alt={`Photo ${i + 1}`} />
                   {i === 0 && <span className="adm-image-cover">Cover</span>}
                   <div className="adm-image-tools">
                     <button type="button" onClick={() => moveImage(i, -1)} disabled={i === 0} aria-label="Move left">←</button>

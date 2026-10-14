@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useCatalog } from "../context/CatalogContext";
 import { BACKEND, placeOrder } from "../lib/api";
-import { formatPrice, shippingFor } from "../lib/catalog";
+import { formatPrice, shippingFor, thumb } from "../lib/catalog";
 import { trackInitiateCheckout, trackPurchase } from "../lib/pixel";
 
 const DETAILS_KEY = "fanaar-checkout-details";
@@ -283,7 +283,7 @@ export default function Checkout() {
             {items.map((i) => (
               <li key={i.key} className="co-line">
                 <div className="co-line-img">
-                  <img src={i.image} alt="" />
+                  <img src={thumb(i.image)} alt="" />
                   <span className="co-line-qty">{i.qty}</span>
                 </div>
                 <div className="co-line-info">

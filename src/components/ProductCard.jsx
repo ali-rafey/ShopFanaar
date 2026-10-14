@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
-import { formatPrice, totalStock } from "../lib/catalog";
+import { formatPrice, thumb, totalStock } from "../lib/catalog";
 import { useInView } from "../lib/useInView";
 import { useSaved } from "../context/SavedContext";
+
+// The second photo only appears on hover, so touch screens never load it.
+const CAN_HOVER = typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 // Gentle height variation for the masonry pinboard. Source photos are 2:3;
 // these ratios only trim background whitespace, never the garment.
@@ -28,11 +31,11 @@ export default function ProductCard({ product, index = 0 }) {
           <span className="card-badge low">Low Stock</span>
         )}
 
-        <img src={product.images[0]} alt={product.title} loading="lazy" />
-        {product.images[1] && (
+        <img src={thumb(product.images[0])} alt={product.title} loading="lazy" />
+        {CAN_HOVER && product.images[1] && (
           <img
             className="alt"
-            src={product.images[1]}
+            src={thumb(product.images[1])}
             alt=""
             aria-hidden="true"
             loading="lazy"

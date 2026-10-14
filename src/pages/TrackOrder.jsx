@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { shop } from "../data/store";
 import { trackOrders } from "../lib/api";
-import { formatPrice } from "../lib/catalog";
+import { formatPrice, thumb } from "../lib/catalog";
 import { FLOW, STATUS } from "../lib/orderStatus";
 
 // "Track your order": the shopper enters the mobile number they ordered with
@@ -178,7 +178,7 @@ function TrackedOrder({ order: o }) {
       <ul className="track-items">
         {o.items.map((i) => (
           <li key={`${i.title}-${i.size}`}>
-            <span className="co-line-img">{i.image && <img src={i.image} alt="" loading="lazy" />}</span>
+            <span className="co-line-img">{i.image && <img src={thumb(i.image)} alt="" loading="lazy" />}</span>
             <span className="track-item-info">
               {i.handle ? <Link to={`/products/${i.handle}`}>{i.title}</Link> : i.title}
               <small>

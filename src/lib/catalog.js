@@ -5,6 +5,11 @@ export function formatPrice(amount) {
   return `${shop.currencySymbol}${Number(amount || 0).toLocaleString("en-PK")}`;
 }
 
+// The small copy of a product photo, for cards, cart and thumbnails. Photos
+// uploaded through the admin come in two sizes (<name>.l.webp for the product
+// page, <name>.s.webp beside it); anything else is used as it is.
+export const thumb = (url) => (typeof url === "string" ? url.replace(/\.l\.(webp|jpe?g)$/, ".s.$1") : url);
+
 export function totalStock(product) {
   return product.sizes.reduce((n, s) => n + s.qty, 0);
 }
