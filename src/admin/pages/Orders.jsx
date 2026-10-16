@@ -5,7 +5,7 @@ import * as api from "../api";
 import { ADMIN_STATUSES, ALL_STATUSES, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
 import {
-  ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, SourceTag, Spinner,
+  ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, SourceTag, Spinner, SuspectTag,
   StatusBadge, timeAgo, useLoad, useToast,
 } from "../ui";
 
@@ -359,7 +359,7 @@ export default function Orders() {
                         <strong>#{o.order_number}</strong>
                       </Link>
                       <small className="muted block">{fmtDate(o.created_at)}</small>
-                      <SourceTag source={o.source} />
+                      <SourceTag source={o.source} /> <SuspectTag order={o} />
                     </td>
                     <td data-label="Customer">
                       {o.customer_name}
@@ -566,6 +566,7 @@ function OrderCell({ order: o, selecting, selected, onToggle }) {
         <span className="adm-cell-tags">
           {withPostEx(o) ? <CourierStatus courier={o.courier} status={o.courier_status} /> : <StatusBadge status={o.status} />}
           <SourceTag source={o.source} />
+          <SuspectTag order={o} />
         </span>
       </span>
       <span className="adm-cell-side">

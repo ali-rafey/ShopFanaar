@@ -82,7 +82,7 @@ export async function getLiveVisitors() {
 
 const ORDER_LIST_COLS =
   "id,order_number,status,payment_status,customer_name,phone,city,total,created_at," +
-  "courier,tracking_number,courier_status,source,order_items(quantity)";
+  "courier,tracking_number,courier_status,source,suspected,order_items(quantity)";
 
 export async function listOrders({ status, search, limit = 50, offset = 0 } = {}) {
   if (!sb) return (await demo()).listOrders({ status, search, limit, offset });
@@ -112,7 +112,7 @@ export async function listOrders({ status, search, limit = 50, offset = 0 } = {}
 export async function getOrder(id) {
   if (!sb) return (await demo()).getOrder(id);
   const [order, items, events] = await Promise.all([
-    sb.from("orders").select("*").eq("id", id).maybeSingle(),
+    sb.from("orders").select("*,suspected").eq("id", id).maybeSingle(),
     sb.from("order_items").select("*").eq("order_id", id).order("title"),
     sb.from("order_events").select("*").eq("order_id", id).order("created_at"),
   ]);
@@ -151,6 +151,23 @@ export async function updateOrder(id, patch) {
 export async function addOrderNote(id, message) {
   if (!sb) return (await demo()).addOrderNote(id, message);
   unwrap(await sb.from("order_events").insert({ order_id: id, kind: "note", message }));
+}
+
+// ---------------------------------------------------------------- detection
+// Orders that look fake or spam (*_order_detection.sql): same connection,
+// different name, phone and address within 7 days.
+
+// → [{ key, first_at, last_at, orders: [{ id, order_number, status, customer_name, phone,
+//      address, city, total, created_at, device, tracking_number, courier_status, suspected, fraud_review }] }]
+export async function detectionGroups() {
+  if (!sb) return (await demo()).detectionGroups();
+  return unwrap(await sb.rpc("detection_groups"));
+}
+
+// verdict: "genuine" (clear the flags) or "spam" (cancel what can be cancelled, restock)
+export async function reviewOrders(ids, verdict) {
+  if (!sb) return (await demo()).reviewOrders(ids, verdict);
+  return unwrap(await sb.rpc("review_orders", { p_order_ids: ids, p_verdict: verdict }));
 }
 
 // Everything the PostEx booking sheet shows for the chosen orders.

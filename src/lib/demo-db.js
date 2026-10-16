@@ -157,6 +157,8 @@ export async function placeOrder(payload) {
       tracking_number: null,
       admin_note: null,
       restocked: false,
+      ip_hash: "demo-connection", // the browser stands in for one internet connection
+      device_hash: navigator.userAgent.length.toString(16),
       created_at: now(),
       updated_at: now(),
     };
@@ -177,6 +179,53 @@ export async function placeOrder(payload) {
   });
   listeners.forEach((fn) => fn({ eventType: "INSERT", new: { id: result.id, order_number: result.order_number, customer_name: payload.customer.name, total: result.total } }));
   return result;
+}
+
+// ---------------------------------------------------------------- detection
+// Mirrors suspected() / detection_groups() / review_orders() in
+// *_order_detection.sql.
+const norm = (t) => String(t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+const WEEK = 7 * 864e5;
+function isSuspected(d, o) {
+  if (!o.ip_hash || o.fraud_review) return false;
+  return d.orders.some(
+    (x) =>
+      x.id !== o.id &&
+      x.ip_hash === o.ip_hash &&
+      Math.abs(Date.parse(x.created_at) - Date.parse(o.created_at)) <= WEEK &&
+      norm(x.customer_name) !== norm(o.customer_name) &&
+      x.phone !== o.phone &&
+      norm(x.address) !== norm(o.address)
+  );
+}
+export function detectionGroups() {
+  return tx((d) => {
+    const flagged = d.orders.filter((o) => isSuspected(d, o));
+    const keys = [...new Set(flagged.map((o) => o.ip_hash))];
+    return keys
+      .map((key) => {
+        const mine = flagged.filter((o) => o.ip_hash === key).map((o) => Date.parse(o.created_at));
+        const [from, to] = [Math.min(...mine) - WEEK, Math.max(...mine) + WEEK];
+        const orders = d.orders
+          .filter((o) => o.ip_hash === key && Date.parse(o.created_at) >= from && Date.parse(o.created_at) <= to)
+          .sort((a, b) => a.created_at.localeCompare(b.created_at))
+          .map((o) => ({ ...o, device: String(o.device_hash || "").slice(0, 4).toUpperCase(), suspected: isSuspected(d, o) }));
+        return { key: key.slice(0, 6).toUpperCase(), first_at: new Date(Math.min(...mine)).toISOString(), last_at: new Date(Math.max(...mine)).toISOString(), orders };
+      })
+      .sort((a, b) => b.last_at.localeCompare(a.last_at));
+  });
+}
+export async function reviewOrders(ids, verdict) {
+  const toCancel = [];
+  await tx((d) => {
+    for (const o of d.orders.filter((x) => ids.includes(x.id))) {
+      o.fraud_review = verdict;
+      addEvent(d, o.id, "note", null, verdict === "spam" ? "Marked as spam (Detection)" : "Checked in Detection — looks genuine");
+      if (verdict === "spam" && !o.tracking_number && ["pending", "confirmed", "packed"].includes(o.status)) toCancel.push(o.id);
+    }
+  });
+  for (const id of toCancel) await setOrderStatus(id, "cancelled", "Cancelled as spam", true);
+  return ids.length;
 }
 
 export function setOrderSource(id, source) {
@@ -373,6 +422,7 @@ export function stats() {
         .slice(0, 20)
         .map(({ v, p }) => ({ id: p.id, title: p.title, handle: p.handle, size: v.size, stock: v.stock })),
       unread_messages: (d.messages || []).filter((m) => m.status === "new").length,
+      suspected_orders: d.orders.filter((o) => isSuspected(d, o)).length,
       subscribers: (d.subscribers || []).length,
     };
   });
@@ -427,6 +477,7 @@ export function listOrders({ status, search, limit = 50, offset = 0 } = {}) {
       count: rows.length,
       rows: rows.slice(offset, offset + limit).map((o) => ({
         ...o,
+        suspected: isSuspected(d, o),
         order_items: d.items.filter((i) => i.order_id === o.id).map((i) => ({ quantity: i.quantity })),
       })),
     };
@@ -438,7 +489,7 @@ export function getOrder(id) {
     const order = d.orders.find((o) => o.id === id);
     if (!order) return null;
     return {
-      order,
+      order: { ...order, suspected: isSuspected(d, order) },
       items: d.items.filter((i) => i.order_id === id),
       events: d.events.filter((e) => e.order_id === id),
     };

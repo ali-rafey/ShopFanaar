@@ -85,6 +85,16 @@ export function SourceTag({ source }) {
   return <span className={`adm-source adm-source-${tone}`}>{short}</span>;
 }
 
+// Flagged by Detection (same connection, different name, phone and address).
+export function SuspectTag({ order }) {
+  if (!order?.suspected) return null;
+  return (
+    <span className="adm-flag" title="Same connection as another order with a different name, phone and address — see Detection">
+      Possible spam
+    </span>
+  );
+}
+
 const PRODUCT_STATUS = { active: "Active", draft: "Draft", archived: "Archived" };
 export function ProductStatusBadge({ status }) {
   return <span className={`adm-badge ps-${status}`}>{PRODUCT_STATUS[status]}</span>;

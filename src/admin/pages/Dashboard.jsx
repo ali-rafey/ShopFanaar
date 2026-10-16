@@ -42,6 +42,19 @@ export default function Dashboard() {
         </Link>
       )}
 
+      {stats.suspected_orders > 0 && (
+        <Link to="/admin/detection" className="adm-nudge is-alert">
+          <span className="adm-nudge-icon" aria-hidden="true">!</span>
+          <span>
+            <strong>
+              {stats.suspected_orders} {stats.suspected_orders === 1 ? "order looks" : "orders look"} like spam
+            </strong>
+            Same connection, different name, phone and address. Review before booking.
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
+
       <section className="adm-tiles" aria-label="Key numbers">
         <Tile
           label="Orders to confirm"

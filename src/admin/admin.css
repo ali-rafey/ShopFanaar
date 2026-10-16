@@ -1463,7 +1463,7 @@ textarea.adm-input {
   /* Bottom tab bar */
   .adm-tabbar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     position: fixed;
     left: 0;
     right: 0;
@@ -2030,6 +2030,25 @@ textarea.adm-input {
 }
 .adm-nudge:hover {
   border-color: var(--a-ink);
+}
+.adm-nudge.is-alert {
+  border-color: #f0c9c2;
+  background: #fff6f4;
+}
+.adm-nudge.is-alert:hover {
+  border-color: #c4412f;
+}
+.adm-nudge-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #c4412f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
 }
 
 /* ------------------------------------------------- orders: select + bulk */
@@ -2794,4 +2813,167 @@ textarea.adm-input {
 .adm-source-rows dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* Detection: orders that look fake or spam */
+.adm-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #fbe6e3;
+  color: #8a2c1f;
+}
+.adm-orders td .adm-flag {
+  margin-top: 4px;
+}
+.adm-flag-callout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: #f0c9c2;
+  background: #fff6f4;
+}
+.adm-flag-callout strong {
+  color: #8a2c1f;
+}
+.adm-flag-callout p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--a-ink-2);
+}
+.adm-flag-callout .adm-btn {
+  flex: none;
+}
+.adm-detect-rule h2,
+.adm-detect-group h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.adm-detect-rule p {
+  margin: 0;
+}
+.adm-detect-rule p + p {
+  margin-top: 8px;
+}
+.adm-detect-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-detect-head h2 small {
+  font-weight: 400;
+  color: var(--a-muted);
+}
+.adm-detect-head .adm-hint {
+  margin: 0;
+}
+.adm-evidence {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fdf1d6;
+  color: #7a5300;
+}
+.adm-evidence.is-strong {
+  background: #fbe6e3;
+  color: #8a2c1f;
+}
+.adm-detect-why {
+  margin: 10px 0 12px;
+  font-size: 13px;
+  color: var(--a-ink-2);
+}
+.adm-detect-orders {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 1px solid var(--a-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.adm-detect-orders li + li {
+  border-top: 1px solid var(--a-line);
+}
+.adm-detect-orders li.is-flagged {
+  box-shadow: inset 3px 0 0 #c4412f;
+}
+.adm-detect-orders li:not(.is-flagged) {
+  opacity: 0.7;
+}
+.adm-detect-orders li {
+  display: flex;
+  align-items: stretch;
+}
+.adm-detect-tick {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  width: 40px;
+  padding: 12px 0 0 14px;
+  cursor: pointer;
+}
+.adm-detect-tick input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #c4412f;
+  cursor: pointer;
+}
+.adm-detect-order {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.adm-detect-main small.adm-detect-repeat {
+  color: #7a5300;
+}
+.adm-detect-order:hover {
+  background: #fafaf8;
+}
+.adm-detect-main {
+  min-width: 0;
+}
+.adm-detect-main small {
+  display: block;
+  color: var(--a-muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.adm-detect-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.adm-detect-actions {
+  justify-content: flex-end;
+}
+.adm-detect-note {
+  text-align: right;
+}
+@media (max-width: 700px) {
+  .adm-detect-head {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .adm-detect-actions .adm-btn {
+    flex: 1;
+  }
+  .adm-flag-callout {
+    flex-direction: column;
+  }
 }

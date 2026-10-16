@@ -69,6 +69,21 @@ export default function OrderDetail() {
         }
       />
 
+      {o.suspected && (
+        <section className="adm-card adm-flag-callout">
+          <div>
+            <strong>Possible spam</strong>
+            <p>
+              Another order came from the same internet connection with a different name, phone number and address.
+              Check before confirming.
+            </p>
+          </div>
+          <Link to="/admin/detection" className="adm-btn">
+            Review in Detection
+          </Link>
+        </section>
+      )}
+
       <StatusPanel order={o} busy={busy} act={act} onDeleted={() => navigate("/admin/orders")} />
 
       <div className="adm-detail">

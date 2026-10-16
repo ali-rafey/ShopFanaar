@@ -129,6 +129,11 @@ export function Privacy() {
             which of our ads you clicked) is saved with the order.
           </li>
           <li>
+            <strong>To stop fake orders:</strong> each order also keeps a scrambled (one-way) code of
+            the internet connection and of the browser it was placed from — not your IP address
+            itself — so we can spot many orders under different names from one place.
+          </li>
+          <li>
             <strong>When you track an order:</strong> the number you enter is only used to find
             your orders. To stop misuse, we keep a scrambled (one-way) code of your connection
             for a day — not your IP address itself.

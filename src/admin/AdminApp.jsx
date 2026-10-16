@@ -12,6 +12,7 @@ import Products from "./pages/Products";
 import ProductEdit from "./pages/ProductEdit";
 import Settings from "./pages/Settings";
 import Inbox from "./pages/Inbox";
+import Detection from "./pages/Detection";
 import "./admin.css";
 
 // ---------------------------------------------------------------- auth state
@@ -167,6 +168,7 @@ const NAV = [
   { to: "/admin", end: true, label: "Overview", icon: "M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 7h6V4h-6z" },
   { to: "/admin/orders", label: "Orders", icon: "M6 7h12l-1 13H7L6 7zm3 0V5.5a3 3 0 0 1 6 0V7", badge: "pending" },
   { to: "/admin/products", label: "Products", icon: "M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10" },
+  { to: "/admin/detection", label: "Detection", icon: "M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3zM12 8v4M12 15.5v.5", badge: "suspected" },
   { to: "/admin/inbox", label: "Inbox", icon: "M4 13h4l2 3h4l2-3h4M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z", badge: "unread" },
   { to: "/admin/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z" },
 ];
@@ -178,6 +180,7 @@ function Layout() {
   const badges = {
     pending: stats?.by_status?.pending || 0,
     unread: stats?.unread_messages || 0,
+    suspected: stats?.suspected_orders || 0,
   };
   // Detail screens hide the tab bar on phones, like a native app's pushed view.
   const detail = /^\/admin\/(orders|products)\/[^/]+/.test(pathname);
@@ -319,6 +322,7 @@ export default function AdminApp() {
             <Route path="products" element={<Products />} />
             <Route path="products/new" element={<ProductEdit />} />
             <Route path="products/:id" element={<ProductEdit />} />
+            <Route path="detection" element={<Detection />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
