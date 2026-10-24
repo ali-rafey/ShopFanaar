@@ -170,6 +170,33 @@ export async function reviewOrders(ids, verdict) {
   return unwrap(await sb.rpc("review_orders", { p_order_ids: ids, p_verdict: verdict }));
 }
 
+// Orders → Returned: parcels returned to us, with what was in them — newest
+// back first, the ones the admin hasn't checked yet before the rest.
+const RETURN_COLS =
+  "id,order_number,customer_name,phone,city,total,courier,tracking_number,courier_status,courier_amount," +
+  "courier_returned_at,return_received_at,restocked,updated_at,order_items(id,title,size,quantity,image,variant_id)";
+
+export async function listReturns() {
+  if (!sb) return (await demo()).listReturns();
+  const rows = unwrap(
+    await sb
+      .from("orders")
+      .select(RETURN_COLS)
+      .eq("status", "returned")
+      .order("courier_returned_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .limit(200)
+  );
+  const toCheck = (o) => !o.restocked && !o.return_received_at;
+  return [...rows.filter(toCheck), ...rows.filter((o) => !toCheck(o))];
+}
+
+// The admin has opened a returned parcel: restock its items (true) or not.
+export async function receiveReturn(id, restock, note) {
+  if (!sb) return (await demo()).receiveReturn(id, restock, note);
+  return unwrap(await sb.rpc("receive_return", { p_order_id: id, p_restock: restock, p_note: note || null }));
+}
+
 // Everything the PostEx booking sheet shows for the chosen orders.
 const BOOKING_COLS =
   "id,order_number,status,payment_status,customer_name,phone,address,city,postal_code,customer_note,total," +

@@ -228,6 +228,39 @@ export async function reviewOrders(ids, verdict) {
   return ids.length;
 }
 
+// Mirrors listReturns() in src/admin/api.js and receive_return() in
+// *_courier_returns.sql.
+export function listReturns() {
+  return tx((d) => {
+    const rows = d.orders
+      .filter((o) => o.status === "returned")
+      .sort((a, b) => (b.courier_returned_at || "").localeCompare(a.courier_returned_at || "") || b.updated_at.localeCompare(a.updated_at))
+      .map((o) => ({ ...o, order_items: d.items.filter((i) => i.order_id === o.id) }));
+    const toCheck = (o) => !o.restocked && !o.return_received_at;
+    return [...rows.filter(toCheck), ...rows.filter((o) => !toCheck(o))];
+  });
+}
+export function receiveReturn(id, restock, note) {
+  return tx((d) => {
+    const o = d.orders.find((x) => x.id === id);
+    if (!o) fail("Order not found.");
+    if (o.status !== "returned") fail(`Order #${o.order_number} isn't marked returned.`);
+    if (o.return_received_at || o.restocked) fail(`Order #${o.order_number} has already been checked.`);
+    if (restock) {
+      for (const i of d.items.filter((x) => x.order_id === o.id)) {
+        const v = d.variants.find((x) => x.id === i.variant_id);
+        if (v) v.stock += i.quantity;
+      }
+    }
+    o.restocked = restock;
+    o.return_received_at = now();
+    o.updated_at = now();
+    const base = restock ? "Return checked — items back in stock" : "Return checked — not put back in stock";
+    addEvent(d, o.id, "note", null, note?.trim() ? `${base}: ${note.trim()}` : base);
+    return o;
+  });
+}
+
 export function setOrderSource(id, source) {
   return tx((d) => {
     const o = d.orders.find((x) => x.id === id);
@@ -404,7 +437,9 @@ export function stats() {
         const tracked = d.orders.filter((o) => o.tracking_number);
         const delivered = tracked.filter((o) => o.status === "delivered");
         const recentDelivered = delivered.filter((o) => new Date(o.courier_delivered_at || o.updated_at) > month);
-        const withCourier = tracked.filter((o) => ["packed", "shipped"].includes(o.status));
+        const comingBack = (o) => /return/i.test(o.courier_status || "");
+        const withCourier = tracked.filter((o) => ["packed", "shipped"].includes(o.status) && !comingBack(o));
+        const returned = tracked.filter((o) => o.status === "returned");
         return {
           to_book: d.orders.filter((o) => o.status === "confirmed" && !o.tracking_number).length,
           with_courier_count: withCourier.length,
@@ -413,6 +448,10 @@ export function stats() {
           delivered_30d_amount: recentDelivered.reduce((n, o) => n + amount(o), 0),
           delivered_all_count: delivered.length,
           delivered_all_amount: delivered.reduce((n, o) => n + amount(o), 0),
+          returned_all_count: returned.length,
+          returned_all_amount: returned.reduce((n, o) => n + amount(o), 0),
+          returns_to_check: d.orders.filter((o) => o.status === "returned" && !o.restocked && !o.return_received_at).length,
+          returning_count: tracked.filter((o) => ["packed", "shipped"].includes(o.status) && comingBack(o)).length,
         };
       })(),
       low_stock: d.variants

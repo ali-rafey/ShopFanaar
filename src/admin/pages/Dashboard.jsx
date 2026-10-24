@@ -80,6 +80,12 @@ export default function Dashboard() {
           note={`${stats.delivered_30d_count || 0} ${stats.delivered_30d_count === 1 ? "parcel" : "parcels"} · ${compactMoney(stats.delivered_all_amount || 0)} all time`}
           to="/admin/orders?status=delivered"
         />
+        <Tile
+          label={stats.returns_to_check > 0 ? "Returns to check" : "Returned to you"}
+          value={stats.returns_to_check > 0 ? stats.returns_to_check : stats.returned_all_count || 0}
+          note={returnsNote(stats)}
+          to="/admin/orders?status=returned"
+        />
       </section>
 
       <LiveView />
@@ -356,6 +362,18 @@ function Bars({ title, rows, total }) {
       </ul>
     </div>
   );
+}
+
+// e.g. "Rs 16K · 24% return rate · 1 on the way back"
+function returnsNote(stats) {
+  const returned = stats.returned_all_count || 0;
+  const finished = (stats.delivered_all_count || 0) + returned;
+  const bits = [
+    stats.returns_to_check > 0 ? `${returned} returned in all` : compactMoney(stats.returned_all_amount || 0),
+    finished > 0 && `${Math.round((returned / finished) * 100)}% return rate`,
+    stats.returning_count > 0 && `${stats.returning_count} on the way back`,
+  ];
+  return bits.filter(Boolean).join(" · ");
 }
 
 function Tile({ label, value, note, to }) {

@@ -4,6 +4,7 @@ import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ALL_STATUSES, FLOW, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
+import { ReceiveReturn } from "./Returns";
 import { thumb } from "../../lib/catalog";
 import {
   ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, isMetaPlatform, money, PageHead, PayBadge, SourceTag, Spinner,
@@ -84,7 +85,7 @@ export default function OrderDetail() {
         </section>
       )}
 
-      <StatusPanel order={o} busy={busy} act={act} onDeleted={() => navigate("/admin/orders")} />
+      <StatusPanel order={o} items={items} busy={busy} act={act} onDeleted={() => navigate("/admin/orders")} />
 
       <div className="adm-detail">
         <div className="adm-detail-main">
@@ -151,7 +152,7 @@ export default function OrderDetail() {
 
 // ------------------------------------------------------------- status panel
 
-function StatusPanel({ order: o, busy, act, onDeleted }) {
+function StatusPanel({ order: o, items, busy, act, onDeleted }) {
   const closed = o.status === "cancelled" || o.status === "returned";
   const booked = Boolean(o.tracking_number);
   const [note, setNote] = useState("");
@@ -181,11 +182,24 @@ function StatusPanel({ order: o, busy, act, onDeleted }) {
 
   return (
     <section className="adm-card adm-status-panel">
-      {closed ? (
+      {o.status === "returned" && !o.restocked && !o.return_received_at ? (
+        <div className="adm-return-check">
+          <p>
+            <strong>Returned</strong>
+            {o.courier_returned_at ? ` — ${o.courier || "the courier"} brought it back on ${fmtDate(o.courier_returned_at, false)}` : ""}.
+            {" "}Open the parcel and check the articles before they go back in stock.
+          </p>
+          <ReceiveReturn order={{ ...o, order_items: items }} onDone={() => act(async () => {})} />
+        </div>
+      ) : closed ? (
         <div className="adm-status-row">
           <p>
             This order is <strong>{STATUS[o.status].label.toLowerCase()}</strong>
-            {o.restocked ? " and its items are back in stock." : "."}
+            {o.return_received_at
+              ? `. Checked ${fmtDate(o.return_received_at, false)} — ${o.restocked ? "items back in stock." : "not put back in stock."}`
+              : o.restocked
+                ? " and its items are back in stock."
+                : "."}
           </p>
           <div className="adm-btns">
             <button className="adm-btn" disabled={busy} onClick={() => move("pending")}>

@@ -53,6 +53,7 @@ export function courierTone(status) {
   const s = String(status || "").toLowerCase();
   if (!s) return "waiting";
   if (/^delivered$/.test(s)) return "delivered";
+  if (/^returned to you$/.test(s)) return "closed"; // back with us (courier_returned)
   if (/attempt|review|return|refused|un-?assigned/.test(s)) return "attention";
   if (/cancel|expire/.test(s)) return "closed";
   if (/out for delivery/.test(s)) return "out";

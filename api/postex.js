@@ -105,10 +105,18 @@ function pakistanTime(value) {
   return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
+// The day as people in Pakistan read it, e.g. "21 Oct".
+const pkDay = (iso) => {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" });
+};
+
 // Bring an order in line with its PostEx parcel: PostEx's status, the cash it
 // collects, its delivery date, and — once PostEx has returned the parcel to
-// us — the return itself (items back in stock). Returns the order's status.
-async function applyProgress(db, order, tracking, row) {
+// us (`back`, from its tracking history) — the return itself. Nothing goes
+// back in stock until the admin has checked the parcel (receive_return).
+// Returns the order's status.
+async function applyProgress(db, order, tracking, row, back = null) {
   const p = postex.progress(row);
   const rpc = (fn, body) => db(`rpc/${fn}`, { method: "POST", body });
   await rpc("courier_details", {
@@ -124,7 +132,9 @@ async function applyProgress(db, order, tracking, row) {
     p_picked_up: p.pickedUp,
     p_delivered: p.delivered,
   });
-  if (p.returned) return rpc("courier_returned", { p_order_id: order.id, p_tracking: tracking });
+  if (back) {
+    return rpc("courier_returned", { p_order_id: order.id, p_tracking: tracking, p_returned_at: pakistanTime(back.returnedAt) });
+  }
   return after;
 }
 
@@ -302,11 +312,21 @@ async function book(db, body) {
   return { results };
 }
 
+// Where a parcel PostEx lists as "Return" really is: on its way back, or back
+// with us. null when PostEx can't be asked right now.
+async function returnState(tracking) {
+  try {
+    return postex.returnState(await postex.trackOrder(tracking));
+  } catch {
+    return null;
+  }
+}
+
 // Link portal bookings to their orders and bring every PostEx order up to
 // date: status, the cash PostEx collects and delivery dates. Orders only move
-// forward, and a parcel PostEx has returned to us marks the order returned
-// (items back in stock). Parcels on their way back and courier cancellations
-// are reported for the admin.
+// forward, and a parcel PostEx has returned to us marks the order returned —
+// waiting for the admin to check it before anything is restocked. Returns,
+// parcels on their way back and courier cancellations are reported.
 async function sync(db) {
   const since = new Date(Date.now() - 90 * DAY).toISOString();
   const orders = await db(
@@ -332,13 +352,22 @@ async function sync(db) {
 
   const report = async (order, tracking, row) => {
     const p = postex.progress(row);
-    const after = await applyProgress(db, order, tracking, row);
+    const ret = p.returning ? await returnState(tracking) : null;
+    const after = await applyProgress(db, order, tracking, row, ret?.backWithUs ? ret : null);
     if (after && after !== order.status) out.moved.push({ id: order.id, order_number: order.order_number, from: order.status, to: after });
-    if (p.returning && !p.returned) {
+    if (ret?.backWithUs) {
       out.attention.push({
         id: order.id,
         order_number: order.order_number,
-        message: `PostEx says “${p.status}” — it's on its way back. It'll be marked returned (and restocked) once it reaches you.`,
+        message: `PostEx returned this parcel to you${pkDay(ret.returnedAt) ? ` on ${pkDay(ret.returnedAt)}` : ""}. Open it and check the items in Orders → Returned, then put them back in stock.`,
+      });
+    } else if (p.returning) {
+      out.attention.push({
+        id: order.id,
+        order_number: order.order_number,
+        message: ret
+          ? `On its way back to you — PostEx: “${ret.message || p.status}”${pkDay(ret.at) ? ` (${pkDay(ret.at)})` : ""}.`
+          : `PostEx says “${p.status}” — couldn't check yet whether it has reached you; the next sync will.`,
       });
     } else if (p.cancelled) {
       out.attention.push({ id: order.id, order_number: order.order_number, message: "The PostEx booking was cancelled — book it again or cancel the order." });

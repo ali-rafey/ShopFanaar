@@ -13,6 +13,9 @@
 //     undocumented ones such as "In Stock" and "Transferred" (both in transit)
 //     — so progress is read from the pickup date and "Delivered", never from
 //     a fixed list of status names.
+//   * a parcel back with us shows as "Return" in the list (never "Returned"),
+//     so whether it has actually reached us is read from its tracking history
+//     (track-order): code 0006, "Returned at Merchant Warehouse".
 
 const BASE = "https://api.postex.pk/services/integration/api/order";
 
@@ -94,6 +97,28 @@ export function airwayBills(trackingNumbers) {
   return call("/v1/get-invoice", { query: { trackingNumbers: trackingNumbers.join(",") }, pdf: true, timeout: 40000 });
 }
 
+// One parcel with its tracking history:
+// dist.transactionStatusHistory = [{ transactionStatusMessage, transactionStatusMessageCode, updatedAt }].
+export function trackOrder(trackingNumber) {
+  return call(`/v1/track-order/${encodeURIComponent(trackingNumber)}`);
+}
+
+// The latest tracking event, and — when the parcel has been returned to us —
+// when. → { message, at, backWithUs, returnedAt }
+export function returnState(track) {
+  const history = (track?.transactionStatusHistory || [])
+    .map((h) => ({
+      code: String(h.transactionStatusMessageCode || "").trim(),
+      message: String(h.transactionStatusMessage || "").trim(),
+      at: h.updatedAt || h.modifiedDatetime || null,
+    }))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const last = history.at(-1) || null;
+  const isBack = (h) => h.code === "0006" || /returned (at|to) (the )?(merchant|shipper)/i.test(h.message);
+  const back = last && isBack(last) ? last : null;
+  return { message: last?.message || "", at: last?.at || null, backWithUs: Boolean(back), returnedAt: back?.at || null };
+}
+
 // Load sheet for the pickup rider (also tells PostEx these are ready).
 export function loadSheet(trackingNumbers) {
   return call("/v2/generate-load-sheet", { method: "POST", body: { trackingNumbers }, pdf: true, timeout: 40000 });
@@ -110,8 +135,8 @@ export function progress(row) {
     status,
     cancelled,
     delivered,
-    returned: s === "returned", // back with us — final
-    returning: /return/.test(s), // on its way back, or back
+    // Being returned, or back with us — trackOrder() + returnState() tell which.
+    returning: /return/.test(s),
     pickedUp: delivered || (!cancelled && Boolean(row.orderPickupDate)),
   };
 }

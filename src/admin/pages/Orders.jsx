@@ -4,6 +4,7 @@ import { useFeed } from "../AdminApp";
 import * as api from "../api";
 import { ADMIN_STATUSES, ALL_STATUSES, STATUS } from "../../lib/orderStatus";
 import { BookingSheet, openPdf } from "../PostEx";
+import Returns from "./Returns";
 import {
   ActionSheet, CourierStatus, ErrorBox, fmtDate, fmtPhone, money, PageHead, PayBadge, SourceTag, Spinner, SuspectTag,
   StatusBadge, timeAgo, useLoad, useToast,
@@ -225,7 +226,7 @@ export default function Orders() {
                 <SyncIcon />
               </button>
             )}
-            {rows.length > 0 && (
+            {rows.length > 0 && status !== "returned" && (
               <button
                 className="adm-navbtn adm-only-mobile-inline"
                 onClick={() => (selecting ? clearSelection() : setSelecting(true))}
@@ -267,139 +268,150 @@ export default function Orders() {
             className={status === s ? "on" : ""}
             onClick={() => setStatus(s)}
           >
-            {STATUS[s].label} <span>{by[s] || 0}</span>
+            {STATUS[s].label}{" "}
+            {s === "returned" && stats?.returns_to_check > 0 ? (
+              <span className="is-alert">{stats.returns_to_check} to check</span>
+            ) : (
+              <span>{by[s] || 0}</span>
+            )}
           </button>
         ))}
       </div>
 
-      <div className="adm-toolbar">
-        <input
-          type="search"
-          className="adm-search"
-          placeholder="Search order #, name, phone or city"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search orders"
-        />
-        {(status === "confirmed" || status === "packed") && rows.some((o) => !o.tracking_number) && !selecting && (
-          <button
-            className="adm-btn primary"
-            onClick={() => setBooking({ ids: rows.filter((o) => !o.tracking_number).map((o) => o.id) })}
-          >
-            Book all with PostEx
-          </button>
-        )}
-      </div>
-
-      <ErrorBox error={list.error} onRetry={list.reload} />
-      {list.data === undefined ? (
-        <Spinner />
-      ) : rows.length === 0 ? (
-        <p className="adm-empty">
-          {q || status ? "No orders match this filter." : "No orders yet. They'll show up here the moment someone checks out."}
-        </p>
+      {status === "returned" ? (
+        <Returns version={list.data} />
       ) : (
         <>
-          {/* ---------------- phone: one list, newest first */}
-          <div className="adm-only-mobile adm-phone-list">
-            {selecting && (
-              <button className="adm-select-all" onClick={toggleAll}>
-                {allOnPage ? "Deselect All" : `Select All ${rows.length}`}
+          <div className="adm-toolbar">
+            <input
+              type="search"
+              className="adm-search"
+              placeholder="Search order #, name, phone or city"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search orders"
+            />
+            {(status === "confirmed" || status === "packed") && rows.some((o) => !o.tracking_number) && !selecting && (
+              <button
+                className="adm-btn primary"
+                onClick={() => setBooking({ ids: rows.filter((o) => !o.tracking_number).map((o) => o.id) })}
+              >
+                Book all with PostEx
               </button>
             )}
-            <ul className="adm-cells">
-              {rows.map((o) => (
-                <OrderCell
-                  key={o.id}
-                  order={o}
-                  selecting={selecting}
-                  selected={selected.has(o.id)}
-                  onToggle={() => toggle(o.id)}
-                />
-              ))}
-            </ul>
-            {sync.at && (
-              <p className="adm-list-foot">
-                PostEx checked {timeAgo(new Date(sync.at).toISOString())} · pull down to refresh
-              </p>
-            )}
           </div>
 
-          {/* ---------------- computer: the table */}
-          <div className="adm-card flush adm-only-desktop adm-scroll-x">
-            <table className="adm-table adm-orders">
-              <thead>
-                <tr>
-                  <th className="adm-check-col">
-                    <input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="Select all orders on this page" />
-                  </th>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>City</th>
-                  <th className="num adm-wide-only">Items</th>
-                  <th className="num">Total</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th>Tracking</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((o) => (
-                  <tr key={o.id} className={selected.has(o.id) ? "is-selected" : ""} onClick={() => navigate(`/admin/orders/${o.id}`)}>
-                    <td className="adm-check-col" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        onChange={() => toggle(o.id)}
-                        aria-label={`Select order ${o.order_number}`}
-                      />
-                    </td>
-                    <td data-label="Order">
-                      <Link to={`/admin/orders/${o.id}`} onClick={(e) => e.stopPropagation()}>
-                        <strong>#{o.order_number}</strong>
-                      </Link>
-                      <small className="muted block">{fmtDate(o.created_at)}</small>
-                      <SourceTag source={o.source} /> <SuspectTag order={o} />
-                    </td>
-                    <td data-label="Customer">
-                      {o.customer_name}
-                      <small className="muted block">{fmtPhone(o.phone)}</small>
-                    </td>
-                    <td data-label="City">{o.city}</td>
-                    <td data-label="Items" className="num adm-wide-only">
-                      {o.order_items.reduce((n, i) => n + i.quantity, 0)}
-                    </td>
-                    <td data-label="Total" className="num">{money(o.total)}</td>
-                    <td data-label="Payment"><PayBadge status={o.payment_status} /></td>
-                    <td data-label="Status" onClick={(e) => e.stopPropagation()}>
-                      {withPostEx(o) ? (
-                        <CourierStatus courier={o.courier} status={o.courier_status} />
-                      ) : (
-                        <StatusSelect
-                          status={o.status}
-                          disabled={Boolean(working)}
-                          onChange={(next) => requestStatus([o.id], next)}
-                          label={`Status of order ${o.order_number}`}
-                        />
-                      )}
-                    </td>
-                    <td data-label="Tracking" className="adm-courier-cell">
-                      {o.tracking_number || <span className="muted">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ErrorBox error={list.error} onRetry={list.reload} />
+          {list.data === undefined ? (
+            <Spinner />
+          ) : rows.length === 0 ? (
+            <p className="adm-empty">
+              {q || status ? "No orders match this filter." : "No orders yet. They'll show up here the moment someone checks out."}
+            </p>
+          ) : (
+            <>
+              {/* ---------------- phone: one list, newest first */}
+              <div className="adm-only-mobile adm-phone-list">
+                {selecting && (
+                  <button className="adm-select-all" onClick={toggleAll}>
+                    {allOnPage ? "Deselect All" : `Select All ${rows.length}`}
+                  </button>
+                )}
+                <ul className="adm-cells">
+                  {rows.map((o) => (
+                    <OrderCell
+                      key={o.id}
+                      order={o}
+                      selecting={selecting}
+                      selected={selected.has(o.id)}
+                      onToggle={() => toggle(o.id)}
+                    />
+                  ))}
+                </ul>
+                {sync.at && (
+                  <p className="adm-list-foot">
+                    PostEx checked {timeAgo(new Date(sync.at).toISOString())} · pull down to refresh
+                  </p>
+                )}
+              </div>
+
+              {/* ---------------- computer: the table */}
+              <div className="adm-card flush adm-only-desktop adm-scroll-x">
+                <table className="adm-table adm-orders">
+                  <thead>
+                    <tr>
+                      <th className="adm-check-col">
+                        <input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="Select all orders on this page" />
+                      </th>
+                      <th>Order</th>
+                      <th>Customer</th>
+                      <th>City</th>
+                      <th className="num adm-wide-only">Items</th>
+                      <th className="num">Total</th>
+                      <th>Payment</th>
+                      <th>Status</th>
+                      <th>Tracking</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((o) => (
+                      <tr key={o.id} className={selected.has(o.id) ? "is-selected" : ""} onClick={() => navigate(`/admin/orders/${o.id}`)}>
+                        <td className="adm-check-col" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(o.id)}
+                            onChange={() => toggle(o.id)}
+                            aria-label={`Select order ${o.order_number}`}
+                          />
+                        </td>
+                        <td data-label="Order">
+                          <Link to={`/admin/orders/${o.id}`} onClick={(e) => e.stopPropagation()}>
+                            <strong>#{o.order_number}</strong>
+                          </Link>
+                          <small className="muted block">{fmtDate(o.created_at)}</small>
+                          <SourceTag source={o.source} /> <SuspectTag order={o} />
+                        </td>
+                        <td data-label="Customer">
+                          {o.customer_name}
+                          <small className="muted block">{fmtPhone(o.phone)}</small>
+                        </td>
+                        <td data-label="City">{o.city}</td>
+                        <td data-label="Items" className="num adm-wide-only">
+                          {o.order_items.reduce((n, i) => n + i.quantity, 0)}
+                        </td>
+                        <td data-label="Total" className="num">{money(o.total)}</td>
+                        <td data-label="Payment"><PayBadge status={o.payment_status} /></td>
+                        <td data-label="Status" onClick={(e) => e.stopPropagation()}>
+                          {withPostEx(o) ? (
+                            <CourierStatus courier={o.courier} status={o.courier_status} />
+                          ) : (
+                            <StatusSelect
+                              status={o.status}
+                              disabled={Boolean(working)}
+                              onChange={(next) => requestStatus([o.id], next)}
+                              label={`Status of order ${o.order_number}`}
+                            />
+                          )}
+                        </td>
+                        <td data-label="Tracking" className="adm-courier-cell">
+                          {o.tracking_number || <span className="muted">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {list.data && list.data.count > rows.length && (
+            <div className="adm-more">
+              <button className="adm-btn" onClick={() => setLimit((l) => l + PAGE)} disabled={list.loading}>
+                {list.loading ? "Loading…" : `Show more (${list.data.count - rows.length} more)`}
+              </button>
+            </div>
+          )}
         </>
-      )}
-
-      {list.data && list.data.count > rows.length && (
-        <div className="adm-more">
-          <button className="adm-btn" onClick={() => setLimit((l) => l + PAGE)} disabled={list.loading}>
-            {list.loading ? "Loading…" : `Show more (${list.data.count - rows.length} more)`}
-          </button>
-        </div>
       )}
 
       {/* ---------------- computer: dark selection bar */}
