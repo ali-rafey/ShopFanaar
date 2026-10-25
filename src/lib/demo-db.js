@@ -526,7 +526,7 @@ export function stats() {
         const withCourier = tracked.filter((o) => ["packed", "shipped"].includes(o.status) && !comingBack(o));
         const returned = tracked.filter((o) => o.status === "returned");
         const handedOver = d.orders.filter((o) => o.status === "delivered" && !o.tracking_number);
-        const fee = 300; // courier_fee_estimate()
+        const fee = 380; // courier_fee_estimate()
         const recentReturned = returned.filter((o) => new Date(o.courier_returned_at || o.updated_at) > month);
         const recentHanded = handedOver.filter((o) => new Date(o.updated_at) > month);
         const sum = (list, f) => list.reduce((n, o) => n + f(o), 0);

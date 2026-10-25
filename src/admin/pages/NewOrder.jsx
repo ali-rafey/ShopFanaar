@@ -9,7 +9,7 @@ import { ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
 // An order the admin makes for a sale outside the website (create_manual_order):
 // someone at the shop, or someone who phoned or messaged. Either handed over
 // in person — delivered and paid straight away, full price in the earnings —
-// or sent with PostEx: booked right after, like a website order, and Rs 300
+// or sent with PostEx: booked right after, like a website order, and Rs 380
 // PostEx fee comes off the earnings.
 const CHANNELS = ["Walk-in", "Phone call", "WhatsApp", "Instagram", "Facebook", "Other"];
 const DEFAULT_CHANNEL = { handover: "Walk-in", postex: "Phone call" };
@@ -36,7 +36,7 @@ export default function NewOrder() {
   const byId = useMemo(() => new Map((products || []).map((p) => [p.id, p])), [products]);
   const postex = delivery === "postex";
   const chosenChannel = channel ?? DEFAULT_CHANNEL[delivery];
-  const courierFee = stats?.courier_fee ?? 300;
+  const courierFee = stats?.courier_fee ?? 380;
 
   const subtotal = lines.reduce((n, l) => n + (Number(l.price) || 0) * (Number(l.qty) || 0), 0);
   const storeFee = settings

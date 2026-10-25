@@ -155,11 +155,11 @@ export default function OrderDetail() {
   );
 }
 
-// What this order earns after PostEx's fee (about Rs 300 a parcel, delivered
+// What this order earns after PostEx's fee (about Rs 380 a parcel, delivered
 // or returned); in full when handed over in person.
 function Earnings({ order: o }) {
   const { stats } = useFeed();
-  const fee = stats?.courier_fee ?? 300;
+  const fee = stats?.courier_fee ?? 380;
   const earned = orderEarnings(o, fee);
   const booked = Boolean(o.tracking_number);
   if (earned === null && !(booked && ["packed", "shipped"].includes(o.status))) return null;

@@ -102,10 +102,10 @@ export function SuspectTag({ order }) {
 // admin delivered it). Counts in full in the earnings — no PostEx fee.
 export const handedOver = (o) => o.status === "delivered" && !o.tracking_number;
 
-// What an order earns after PostEx's fee (about Rs 300 a parcel, delivered or
+// What an order earns after PostEx's fee (about Rs 380 a parcel, delivered or
 // returned — courier_fee_estimate() in the database). null while there's
 // nothing to count yet.
-export function orderEarnings(o, fee = 300) {
+export function orderEarnings(o, fee = 380) {
   if (handedOver(o)) return o.total;
   if (!o.tracking_number) return null;
   if (o.status === "delivered") return (o.courier_amount ?? o.total) - fee;

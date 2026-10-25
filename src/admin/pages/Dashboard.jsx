@@ -365,7 +365,7 @@ function Bars({ title, rows, total }) {
 }
 
 // Earnings = cash PostEx collected on delivered parcels − its fee (about
-// Rs 300 a parcel, delivered or returned) + orders handed over in person.
+// Rs 380 a parcel, delivered or returned) + orders handed over in person.
 // e.g. "Rs 41K sales − Rs 6.3K PostEx fees · Rs 34.6K all time"
 function earningsNote(stats) {
   const sales = (stats.delivered_30d_amount || 0) + (stats.handover_30d_amount || 0);
