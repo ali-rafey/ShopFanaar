@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import * as api from "../api";
 import { ConfirmButton, ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
 import NotificationsCard from "../NotificationsCard";
@@ -92,6 +93,17 @@ export default function Settings() {
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <section className="adm-card adm-narrow">
+        <h2>Fanaar Accounts</h2>
+        <p className="adm-sub" style={{ marginBottom: 14 }}>
+          The partners&apos; private books — investment, expenses, inventory, the ABL account and whether Fanaar is in
+          profit. Opens with its own sign-in.
+        </p>
+        <Link to="/admin/accounts" className="adm-btn primary">
+          Open Fanaar Accounts
+        </Link>
+      </section>
 
       <section className="adm-card adm-narrow adm-only-mobile">
         <h2>Account</h2>

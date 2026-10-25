@@ -307,6 +307,27 @@ export async function getProduct(id) {
   return row ? toProduct(row) : null;
 }
 
+// Cost per piece (fabric, stitching, production) — admins only, never on the
+// storefront (public.product_costs). null when not set.
+export async function getProductCost(id) {
+  if (!sb) return (await demo()).getProductCost(id);
+  const row = unwrap(await sb.from("product_costs").select("cost").eq("product_id", id).maybeSingle());
+  return row ? row.cost : null;
+}
+
+export async function saveProductCost(id, cost) {
+  if (!sb) return (await demo()).saveProductCost(id, cost);
+  if (cost == null) unwrap(await sb.from("product_costs").delete().eq("product_id", id));
+  else unwrap(await sb.from("product_costs").upsert({ product_id: id, cost }));
+}
+
+// Listed stock at cost, for Fanaar Accounts:
+// { products: [{ id, title, status, image, price, cost, pieces, value }], total_value, total_pieces, missing_cost }
+export async function inventoryValue() {
+  if (!sb) return (await demo()).inventoryValue();
+  return unwrap(await sb.rpc("inventory_value"));
+}
+
 // `product` is the editor's state (storefront shape). `original` is the
 // product as loaded, used to work out which sizes were removed and whose
 // stock was actually edited — stock is only written when changed, so saving

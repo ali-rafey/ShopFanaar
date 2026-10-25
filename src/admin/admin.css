@@ -3224,3 +3224,16 @@ textarea.adm-input {
     margin-left: auto;
   }
 }
+
+/* Product editor: profit per piece */
+.adm-margin strong {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 15px;
+  color: #22663a;
+  font-variant-numeric: tabular-nums;
+}
+.adm-margin.is-loss strong {
+  color: var(--a-danger);
+}

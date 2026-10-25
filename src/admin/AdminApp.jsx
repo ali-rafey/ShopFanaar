@@ -14,6 +14,7 @@ import ProductEdit from "./pages/ProductEdit";
 import Settings from "./pages/Settings";
 import Inbox from "./pages/Inbox";
 import Detection from "./pages/Detection";
+import Accounts from "./accounts/Accounts";
 import "./admin.css";
 
 // ---------------------------------------------------------------- auth state
@@ -328,6 +329,7 @@ export default function AdminApp() {
             <Route path="detection" element={<Detection />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="accounts" element={<Accounts />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
         </Routes>

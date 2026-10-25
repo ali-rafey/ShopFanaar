@@ -820,6 +820,40 @@ export function getProduct(id) {
   });
 }
 
+// Mirrors public.product_costs / inventory_value() (*_product_costs.sql).
+export function getProductCost(id) {
+  return tx((d) => (d.costs || {})[id] ?? null);
+}
+export function saveProductCost(id, cost) {
+  return tx((d) => {
+    d.costs ||= {};
+    if (cost == null) delete d.costs[id];
+    else d.costs[id] = cost;
+  });
+}
+export function inventoryValue() {
+  return tx((d) => {
+    const costs = d.costs || {};
+    const products = d.products
+      .map((p) => {
+        const pieces = d.variants.filter((v) => v.product_id === p.id).reduce((n, v) => n + v.stock, 0);
+        const cost = costs[p.id] ?? null;
+        return { id: p.id, title: p.title, status: p.status, image: p.images[0] || null, price: p.price, cost, pieces, value: cost == null ? null : pieces * cost };
+      })
+      // In stock without a cost first (like the database), then the most valuable stock.
+      .sort((a, b) => {
+        const missing = (p) => p.cost == null && p.pieces > 0;
+        return missing(b) - missing(a) || (b.value || 0) - (a.value || 0) || b.pieces - a.pieces || a.title.localeCompare(b.title);
+      });
+    return {
+      products,
+      total_value: products.reduce((n, p) => n + (p.value || 0), 0),
+      total_pieces: products.reduce((n, p) => n + p.pieces, 0),
+      missing_cost: products.filter((p) => p.cost == null && p.pieces > 0).length,
+    };
+  });
+}
+
 // row: product columns; variants: [{id?, size, stock?, sku, position}]
 export function saveProduct(id, row, variants) {
   return tx((d) => {

@@ -4,7 +4,7 @@ import * as api from "../api";
 import { prepareImage } from "../image";
 import { defaultSizeChart } from "../../data/store";
 import { thumb, toSizeChart } from "../../lib/catalog";
-import { ConfirmButton, ErrorBox, PageHead, Spinner, useLoad, useToast } from "../ui";
+import { ConfirmButton, ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
 
 const DEFAULT_DISCLAIMER =
   "Color tones may appear slightly different in imagery due to lighting conditions and display variations.";
@@ -28,8 +28,9 @@ const chartForm = (c) => ({
 const NO_CHART = { note: "", columns: [], rows: [] };
 
 // Editor keeps numbers as strings so fields can be cleared while typing.
-function toForm(p) {
+function toForm(p, cost) {
   return {
+    cost: cost == null ? "" : String(cost),
     title: p.title,
     handle: p.handle,
     description: p.description,
@@ -46,6 +47,7 @@ function toForm(p) {
 }
 
 const BLANK = {
+  cost: "",
   title: "",
   handle: "",
   description: "",
@@ -68,6 +70,7 @@ function validate(f) {
   if (!HANDLE_RE.test(f.handle)) e.handle = "Use lowercase letters, numbers and dashes only.";
   if (Number.isNaN(int(f.price))) e.price = "Enter a whole number of rupees.";
   if (f.compareAtPrice && Number.isNaN(int(f.compareAtPrice))) e.compareAtPrice = "Enter a whole number, or leave empty.";
+  if (f.cost && (Number.isNaN(int(f.cost)) || int(f.cost) > 1000000)) e.cost = "Enter a whole number of rupees, or leave empty.";
   const seen = new Set();
   f.sizes.forEach((s, i) => {
     const k = s.size.trim().toUpperCase();
@@ -99,12 +102,19 @@ export default function ProductEdit() {
   const toast = useToast();
 
   const res = useLoad(
-    () => Promise.all([isNew ? null : api.getProduct(id), api.listCollections(), api.listProducts()]),
+    () =>
+      Promise.all([
+        isNew ? null : api.getProduct(id),
+        api.listCollections(),
+        api.listProducts(),
+        isNew ? null : api.getProductCost(id),
+      ]),
     [id]
   );
   const original = res.data?.[0] || null;
   const collections = res.data?.[1] || [];
   const chartSources = (res.data?.[2] || []).filter((p) => p.id !== id && p.sizeChart);
+  const savedCost = res.data?.[3] ?? null;
 
   const [form, setForm] = useState(null);
   const [initial, setInitial] = useState(null);
@@ -116,12 +126,12 @@ export default function ProductEdit() {
 
   useEffect(() => {
     if (!res.data) return;
-    const f = original ? toForm(original) : BLANK;
+    const f = original ? toForm(original, savedCost) : BLANK;
     setForm(f);
     setInitial(f);
     setHandleTouched(!isNew);
     setErrors({});
-  }, [res.data, original, isNew]);
+  }, [res.data, original, isNew, savedCost]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
 
@@ -223,6 +233,8 @@ export default function ProductEdit() {
         sizeChart: toSizeChart(form.chart),
       };
       const savedId = await api.saveProduct(product, original);
+      const cost = form.cost.trim() ? int(form.cost) : null;
+      if (cost !== savedCost) await api.saveProductCost(savedId, cost);
       const dropped = (original?.images || []).filter((u) => !form.images.includes(u));
       if (dropped.length) api.removeImages(dropped);
       toast(isNew ? "Product created" : "Product saved");
@@ -329,6 +341,16 @@ export default function ProductEdit() {
               >
                 <input inputMode="numeric" value={form.compareAtPrice} onChange={(e) => set("compareAtPrice", e.target.value)} />
               </Field>
+            </div>
+            <div className="adm-row">
+              <Field
+                label="Cost per piece (Rs.)"
+                hint="Fabric, stitching and production. Private — never shown on the website."
+                error={errors.cost}
+              >
+                <input inputMode="numeric" value={form.cost} placeholder="e.g. 1000" onChange={(e) => set("cost", e.target.value)} />
+              </Field>
+              <Margin price={int(form.price)} cost={form.cost.trim() ? int(form.cost) : NaN} />
             </div>
           </section>
 
@@ -645,6 +667,23 @@ function SizeChartCard({ chart, update, errors, stockSizes, sources }) {
         )}
       </div>
     </section>
+  );
+}
+
+// Profit per piece at the listed price (before courier and ads).
+function Margin({ price, cost }) {
+  if (Number.isNaN(price) || Number.isNaN(cost) || price <= 0) {
+    return <div className="adm-field adm-margin" aria-hidden="true" />;
+  }
+  const profit = price - cost;
+  return (
+    <div className={`adm-field adm-margin ${profit < 0 ? "is-loss" : ""}`}>
+      <span>Profit per piece</span>
+      <strong>
+        {profit < 0 ? `−${money(-profit)}` : money(profit)} · {Math.round((profit / price) * 100)}%
+      </strong>
+      <span className="adm-hint">At the listed price, before delivery and ads.</span>
+    </div>
   );
 }
 
