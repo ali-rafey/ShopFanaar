@@ -4,6 +4,7 @@ import * as books from "./api";
 import { thumb } from "../../lib/catalog";
 import { ConfirmButton, money, useToast } from "../ui";
 import { parseAmount, pct, signed } from "./format";
+import { downloadPdf } from "./pdf";
 
 // The four books of Fanaar Accounts. Each entry can be edited or deleted;
 // dates aren't recorded (the partners keep it simple).
@@ -82,6 +83,34 @@ function Entry({ title, sub, amount, tone, busy, onDelete, editor }) {
   );
 }
 
+// A book's heading with its "Download PDF" button.
+function ListHead({ title, onDownload, disabled }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="adm-card-head">
+      <h2>{title}</h2>
+      <button
+        type="button"
+        className="adm-btn acc-download"
+        disabled={disabled || busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onDownload();
+          } catch {
+            toast("Couldn't make the PDF. Try again.", "err");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Making PDF…" : "Download PDF"}
+      </button>
+    </div>
+  );
+}
+
 const FormButtons = ({ busy, label, onCancel, disabled }) => (
   <div className="adm-btns">
     <button className="adm-btn primary" disabled={busy || disabled}>
@@ -154,7 +183,31 @@ export function Investments({ list, sum, onChange }) {
       </section>
 
       <section className="adm-card">
-        <h2>All investments</h2>
+        <ListHead
+          title="All investments"
+          disabled={list.length === 0}
+          onDownload={() =>
+            downloadPdf("investment", "Investment", [
+              {
+                heading: "Who invested",
+                head: ["Partner", "Total invested", "Share"],
+                body: books.PARTNERS.map((p) => [
+                  p,
+                  money(sum.byPartner[p]),
+                  sum.invested ? pct((sum.byPartner[p] / sum.invested) * 100) : "-",
+                ]),
+                foot: ["All time", money(sum.invested), sum.invested ? "100%" : "-"],
+                align: { 1: "right", 2: "right" },
+              },
+              {
+                heading: `All investments (${list.length})`,
+                head: ["#", "Partner", "Amount", "Note"],
+                body: list.map((r, i) => [i + 1, r.partner, money(r.amount), r.note || ""]),
+                align: { 0: "right", 2: "right" },
+              },
+            ])
+          }
+        />
         {list.length === 0 ? (
           <p className="adm-empty">Nothing recorded yet.</p>
         ) : (
@@ -186,6 +239,8 @@ export function Investments({ list, sum, onChange }) {
 }
 
 // ------------------------------------------------------------------ expenses
+
+const GROUP_OF = Object.fromEntries(books.EXPENSE_GROUPS.flatMap((g) => g.categories.map(([key]) => [key, g.label])));
 
 function ExpenseForm({ initial, busy, onSubmit, label, onCancel }) {
   const [category, setCategory] = useState(initial?.category || "");
@@ -250,7 +305,34 @@ export function Expenses({ list, sum, onChange }) {
       </section>
 
       <section className="adm-card">
-        <h2>All expenses</h2>
+        <ListHead
+          title="All expenses"
+          disabled={list.length === 0}
+          onDownload={() =>
+            downloadPdf("expenses", "Expenses", [
+              {
+                heading: "Spent so far",
+                head: ["Type", "Category", "Total"],
+                body: books.EXPENSE_GROUPS.flatMap((g) => [
+                  ...g.categories.map(([key, label]) => [g.label, label, money(sum.byCategory[key])]),
+                  [
+                    { content: g.label, bold: true },
+                    { content: `${g.label} total`, bold: true },
+                    { content: money(g.key === "business" ? sum.business : sum.otherSpend), bold: true },
+                  ],
+                ]),
+                foot: ["All expenses", "", money(sum.business + sum.otherSpend)],
+                align: { 2: "right" },
+              },
+              {
+                heading: `All expenses (${list.length})`,
+                head: ["#", "Type", "Category", "Amount", "Note"],
+                body: list.map((r, i) => [i + 1, GROUP_OF[r.category], books.CATEGORY_LABEL[r.category], money(r.amount), r.note || ""]),
+                align: { 0: "right", 3: "right" },
+              },
+            ])
+          }
+        />
         {list.length === 0 ? (
           <p className="adm-empty">Nothing recorded yet.</p>
         ) : (

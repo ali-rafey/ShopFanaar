@@ -4,19 +4,31 @@
     {
       "name": "fanaar",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "fanaar-demo",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npx vite --port 5174 --strictPort --open false"],
+      "runtimeArgs": [
+        "-c",
+        "VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_ACCOUNTS_SUPABASE_URL= VITE_ACCOUNTS_SUPABASE_ANON_KEY= npx vite --port 5174 --strictPort --open false"
+      ],
       "port": 5174
     },
     {
       "name": "fanaar-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--", "--port", "4173"],
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "4173"
+      ],
       "port": 4173
     }
   ]

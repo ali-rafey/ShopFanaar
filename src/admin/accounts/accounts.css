@@ -345,3 +345,10 @@
     margin-top: -4px;
   }
 }
+
+.acc-download {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+}

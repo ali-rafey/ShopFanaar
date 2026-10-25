@@ -13,3 +13,4 @@ export function parseAmount(text) {
 }
 
 export const sumOf = (rows, key = "amount") => rows.reduce((n, r) => n + Number(r[key] || 0), 0);
+
