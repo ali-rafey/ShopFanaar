@@ -7,7 +7,8 @@ import { BookingSheet, openPdf } from "../PostEx";
 import { ReceiveReturn } from "./Returns";
 import { thumb } from "../../lib/catalog";
 import {
-  ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, isMetaPlatform, money, PageHead, PayBadge, SourceTag, Spinner,
+  ConfirmButton, CourierStatus, ErrorBox, fmtDate, fmtPhone, handedOver, isMetaPlatform, money, orderEarnings, PageHead,
+  PayBadge, SourceTag, Spinner,
   StatusBadge, timeAgo, useLoad, useToast,
 } from "../ui";
 
@@ -110,7 +111,11 @@ export default function OrderDetail() {
               <div><dt>Subtotal</dt><dd>{money(o.subtotal)}</dd></div>
               <div><dt>Shipping</dt><dd>{o.shipping_fee ? money(o.shipping_fee) : "Free"}</dd></div>
               {o.discount > 0 && <div><dt>Discount</dt><dd>−{money(o.discount)}</dd></div>}
-              <div className="grand"><dt>Total · cash on delivery</dt><dd>{money(o.total)}</dd></div>
+              <div className="grand">
+                <dt>{handedOver(o) ? "Total · paid in person" : "Total · cash on delivery"}</dt>
+                <dd>{money(o.total)}</dd>
+              </div>
+              <Earnings order={o} />
             </dl>
           </section>
 
@@ -124,7 +129,7 @@ export default function OrderDetail() {
 
           <section className="adm-card">
             <h2>Payment</h2>
-            <p className="adm-sub">Cash on delivery · {money(o.total)}</p>
+            <p className="adm-sub">{handedOver(o) ? "Paid in person" : "Cash on delivery"} · {money(o.total)}</p>
             <label className="adm-field">
               <span>Payment status</span>
               <select
@@ -146,6 +151,38 @@ export default function OrderDetail() {
       </div>
 
       <PackingSlip order={o} items={items} />
+    </>
+  );
+}
+
+// What this order earns after PostEx's fee (about Rs 300 a parcel, delivered
+// or returned); in full when handed over in person.
+function Earnings({ order: o }) {
+  const { stats } = useFeed();
+  const fee = stats?.courier_fee ?? 300;
+  const earned = orderEarnings(o, fee);
+  const booked = Boolean(o.tracking_number);
+  if (earned === null && !(booked && ["packed", "shipped"].includes(o.status))) return null;
+  if (earned === null) {
+    return (
+      <div className="adm-earn muted">
+        <dt>You'll earn, once delivered</dt>
+        <dd>{money((o.courier_amount ?? o.total) - fee)}</dd>
+      </div>
+    );
+  }
+  return (
+    <>
+      {booked && o.status === "delivered" && (
+        <div className="muted">
+          <dt>PostEx fee (estimate)</dt>
+          <dd>−{money(fee)}</dd>
+        </div>
+      )}
+      <div className="adm-earn">
+        <dt>{o.status === "returned" ? "Returned — PostEx fee lost" : "You earned"}</dt>
+        <dd>{earned < 0 ? `−${money(-earned)}` : money(earned)}</dd>
+      </div>
     </>
   );
 }
@@ -190,6 +227,13 @@ function StatusPanel({ order: o, items, busy, act, onDeleted }) {
             {" "}Open the parcel and check the articles before they go back in stock.
           </p>
           <ReceiveReturn order={{ ...o, order_items: items }} onDone={() => act(async () => {})} />
+        </div>
+      ) : handedOver(o) ? (
+        <div className="adm-status-row">
+          <p>
+            <strong>Handed over in person</strong> — delivered and paid. It counts in full in your earnings (no
+            courier fee).
+          </p>
         </div>
       ) : closed ? (
         <div className="adm-status-row">
@@ -340,7 +384,7 @@ function Customer({ order: o, busy, act }) {
         <div className="adm-btns">
           <button
             className="adm-btn primary"
-            disabled={busy || !form.customer_name?.trim() || !form.phone?.trim()}
+            disabled={busy || !form.customer_name?.trim() || (!form.phone?.trim() && !handedOver(o))}
             onClick={async () => {
               const patch = Object.fromEntries(EDITABLE.map((k) => [k, form[k]?.trim() || null]));
               if (await act(() => api.updateOrder(o.id, patch), "Customer details saved")) setEditing(false);
@@ -375,17 +419,23 @@ function Customer({ order: o, busy, act }) {
         {o.city}
         {o.postal_code ? ` ${o.postal_code}` : ""}
       </p>
-      <p className="adm-contact">
-        <a href={`tel:${o.phone}`}>{fmtPhone(o.phone)}</a>
-        {o.email && <a href={`mailto:${o.email}`}>{o.email}</a>}
-      </p>
+      {(o.phone || o.email) && (
+        <p className="adm-contact">
+          {o.phone && <a href={`tel:${o.phone}`}>{fmtPhone(o.phone)}</a>}
+          {o.email && <a href={`mailto:${o.email}`}>{o.email}</a>}
+        </p>
+      )}
       {o.customer_note && <p className="adm-callout">“{o.customer_note}”</p>}
-      <div className="adm-btns">
-        <a className="adm-btn wa" href={wa} target="_blank" rel="noreferrer">
-          WhatsApp to confirm
-        </a>
-        <a className="adm-btn" href={`tel:${o.phone}`}>Call</a>
-      </div>
+      {o.phone && (
+        <div className="adm-btns">
+          {!handedOver(o) && (
+            <a className="adm-btn wa" href={wa} target="_blank" rel="noreferrer">
+              WhatsApp to confirm
+            </a>
+          )}
+          <a className="adm-btn" href={`tel:${o.phone}`}>Call</a>
+        </div>
+      )}
     </section>
   );
 }
@@ -415,6 +465,18 @@ function OrderSource({ order: o }) {
           <span className="muted">Not recorded</span>
         </summary>
         <p className="adm-hint">Sources are saved for orders placed from 15 October 2026 onwards.</p>
+      </details>
+    );
+  }
+
+  if (src.kind === "manual") {
+    return (
+      <details className="adm-card adm-source-card">
+        <summary>
+          <h2>Where this order came from</h2>
+          <SourceTag source={src} />
+        </summary>
+        <p className="adm-strong">Made by you in the admin · {src.platform}</p>
       </details>
     );
   }
@@ -509,6 +571,15 @@ function Shipping({ order: o, busy, act }) {
           )}
         </div>
         <p className="adm-hint">Sync on the Orders page moves this order on as PostEx picks it up and delivers it.</p>
+      </section>
+    );
+  }
+
+  if (handedOver(o) && !dirty) {
+    return (
+      <section className="adm-card">
+        <h2>Shipping</h2>
+        <p className="adm-sub">Handed over in person — no courier.</p>
       </section>
     );
   }

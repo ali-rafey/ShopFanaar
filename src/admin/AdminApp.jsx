@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
+import NewOrder from "./pages/NewOrder";
 import Products from "./pages/Products";
 import ProductEdit from "./pages/ProductEdit";
 import Settings from "./pages/Settings";
@@ -73,7 +74,8 @@ function FeedProvider({ children }) {
       setVersion((v) => v + 1);
       refreshStats();
       const o = payload?.new;
-      if (payload?.eventType === "INSERT" && o && !seen.current.has(o.id)) {
+      // No sound or banner for an order the admin just made themselves.
+      if (payload?.eventType === "INSERT" && o && o.source?.kind !== "manual" && !seen.current.has(o.id)) {
         seen.current.add(o.id);
         playOrderSound();
         api
@@ -318,6 +320,7 @@ export default function AdminApp() {
           <Route element={<RequireAdmin />}>
             <Route index element={<Dashboard />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="orders/new" element={<NewOrder />} />
             <Route path="orders/:id" element={<OrderDetail />} />
             <Route path="products" element={<Products />} />
             <Route path="products/new" element={<ProductEdit />} />

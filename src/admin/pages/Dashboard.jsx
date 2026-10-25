@@ -75,9 +75,9 @@ export default function Dashboard() {
           to="/admin/orders?status=shipped"
         />
         <Tile
-          label="Delivered sales, 30 days"
-          value={compactMoney(stats.delivered_30d_amount || 0)}
-          note={`${stats.delivered_30d_count || 0} ${stats.delivered_30d_count === 1 ? "parcel" : "parcels"} · ${compactMoney(stats.delivered_all_amount || 0)} all time`}
+          label="Earnings, 30 days"
+          value={compactMoney(stats.earnings_30d ?? stats.delivered_30d_amount ?? 0)}
+          note={earningsNote(stats)}
           to="/admin/orders?status=delivered"
         />
         <Tile
@@ -362,6 +362,18 @@ function Bars({ title, rows, total }) {
       </ul>
     </div>
   );
+}
+
+// Earnings = cash PostEx collected on delivered parcels − its fee (about
+// Rs 300 a parcel, delivered or returned) + orders handed over in person.
+// e.g. "Rs 41K sales − Rs 6.3K PostEx fees · Rs 34.6K all time"
+function earningsNote(stats) {
+  const sales = (stats.delivered_30d_amount || 0) + (stats.handover_30d_amount || 0);
+  const bits = [
+    `${compactMoney(sales)} sales`,
+    stats.courier_fees_30d > 0 && `− ${compactMoney(stats.courier_fees_30d)} PostEx fees`,
+  ].filter(Boolean);
+  return `${bits.join(" ")} · ${compactMoney(stats.earnings_all ?? stats.delivered_all_amount ?? 0)} all time`;
 }
 
 // e.g. "Rs 16K · 24% return rate · 1 on the way back"

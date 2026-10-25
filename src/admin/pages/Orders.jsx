@@ -212,6 +212,9 @@ export default function Orders() {
         sub={`${total} orders in total`}
         actions={
           <>
+            <Link to="/admin/orders/new" className="adm-btn primary adm-only-desktop">
+              New order
+            </Link>
             <button className="adm-btn adm-only-desktop" onClick={() => runSync(false)} disabled={sync.busy}>
               {sync.busy ? "Syncing…" : "Sync PostEx"}
               {sync.at && !sync.busy && <small className="adm-btn-note">{timeAgo(new Date(sync.at).toISOString())}</small>}
@@ -225,6 +228,11 @@ export default function Orders() {
               >
                 <SyncIcon />
               </button>
+            )}
+            {!selecting && (
+              <Link to="/admin/orders/new" className="adm-navbtn adm-only-mobile-inline adm-navbtn-add" aria-label="New order">
+                +
+              </Link>
             )}
             {rows.length > 0 && status !== "returned" && (
               <button

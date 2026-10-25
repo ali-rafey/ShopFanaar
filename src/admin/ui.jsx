@@ -7,6 +7,7 @@ export { formatPrice as money } from "../lib/catalog";
 
 export function compactMoney(n) {
   const v = Number(n || 0);
+  if (v < 0) return `−${compactMoney(-v)}`;
   if (v >= 1e7) return `Rs.${(v / 1e7).toFixed(v >= 1e8 ? 0 : 1)}Cr`;
   if (v >= 1e5) return `Rs.${(v / 1e5).toFixed(v >= 1e6 ? 0 : 1)}L`;
   if (v >= 1e4) return `Rs.${(v / 1e3).toFixed(0)}K`;
@@ -76,6 +77,7 @@ const META = new Set(["Instagram", "Facebook", "Threads", "Messenger", "Audience
 export const isMetaPlatform = (platform) => META.has(platform);
 export function sourceShort(src) {
   if (!src) return null;
+  if (src.kind === "manual") return src.platform || "Made by you"; // create_manual_order
   if (src.kind === "direct" || !src.platform) return "Direct";
   return src.kind === "ad" ? `${src.platform} ad` : src.platform;
 }
@@ -94,6 +96,21 @@ export function SuspectTag({ order }) {
       Possible spam
     </span>
   );
+}
+
+// Delivered without a courier: handed over in person (a walk-in, or the
+// admin delivered it). Counts in full in the earnings — no PostEx fee.
+export const handedOver = (o) => o.status === "delivered" && !o.tracking_number;
+
+// What an order earns after PostEx's fee (about Rs 300 a parcel, delivered or
+// returned — courier_fee_estimate() in the database). null while there's
+// nothing to count yet.
+export function orderEarnings(o, fee = 300) {
+  if (handedOver(o)) return o.total;
+  if (!o.tracking_number) return null;
+  if (o.status === "delivered") return (o.courier_amount ?? o.total) - fee;
+  if (o.status === "returned") return -fee;
+  return null;
 }
 
 const PRODUCT_STATUS = { active: "Active", draft: "Draft", archived: "Archived" };

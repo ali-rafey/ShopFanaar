@@ -181,6 +181,91 @@ export async function placeOrder(payload) {
   return result;
 }
 
+// Mirrors create_manual_order() in *_manual_orders_earnings.sql.
+export async function createManualOrder(p) {
+  const result = await tx((d) => {
+    const c = p.customer || {};
+    const handover = p.delivery === "handover";
+    if (!["handover", "postex"].includes(p.delivery)) fail("Choose how the order reaches the customer.");
+    if (!p.channel) fail("Choose where the order came from.");
+    let phone = String(c.phone || "").replace(/\D/g, "");
+    if (phone) {
+      phone = phone.replace(/^(0092|92|0)/, "");
+      if (!/^3\d{9}$/.test(phone)) fail("Please enter a valid mobile number, e.g. 0300 1234567.");
+      phone = "0" + phone;
+    }
+    const name = c.name?.trim(), address = c.address?.trim(), city = c.city?.trim();
+    if (!handover) {
+      if (!name) fail("Enter the customer's name for PostEx.");
+      if (!phone) fail("Enter the customer's mobile number for PostEx.");
+      if (!address || address.length < 5) fail("Enter the full delivery address for PostEx.");
+      if (!city || city.length < 2) fail("Enter the city for PostEx.");
+    }
+    const items = p.items || [];
+    if (!items.length) fail("Add at least one article.");
+    const need = new Map();
+    for (const i of items) {
+      if (!(i.qty >= 1 && i.qty <= 50)) fail("Please check the quantities.");
+      if (!(i.price >= 0 && i.price <= 1e6) || !Number.isInteger(i.price)) fail("Please check the prices.");
+      const k = `${i.product_id}|${i.size}`;
+      need.set(k, (need.get(k) || 0) + i.qty);
+    }
+    for (const [k, qty] of need) {
+      const [pid, size] = k.split("|");
+      const v = d.variants.find((x) => x.product_id === pid && x.size === size);
+      const prod = d.products.find((x) => x.id === pid);
+      if (!v || !prod) fail("One of the articles isn't in your products any more.");
+      if (v.stock < qty) {
+        fail(v.stock === 0
+          ? `${prod.title} (size ${size}) is out of stock — update its stock in Products first.`
+          : `Only ${v.stock} left of ${prod.title} in size ${size} — update its stock in Products first.`);
+      }
+    }
+    const shipping = handover ? 0 : Number(p.shipping_fee) || 0;
+    const subtotal = items.reduce((n, i) => n + i.price * i.qty, 0);
+    const order = {
+      id: crypto.randomUUID(),
+      order_number: d.seq++,
+      status: handover ? "delivered" : "confirmed",
+      payment_method: "cod",
+      payment_status: handover ? "paid" : "unpaid",
+      customer_name: name || "Walk-in customer",
+      phone,
+      email: null,
+      address: address || "Handed over in person",
+      city: city || "Faisalabad",
+      postal_code: null,
+      customer_note: null,
+      subtotal,
+      shipping_fee: shipping,
+      discount: 0,
+      total: subtotal + shipping,
+      courier: null,
+      tracking_number: null,
+      admin_note: p.note?.trim() || null,
+      restocked: false,
+      source: { kind: "manual", platform: p.channel },
+      ip_hash: null,
+      device_hash: null,
+      created_at: now(),
+      updated_at: now(),
+    };
+    d.orders.push(order);
+    for (const i of items) {
+      const v = d.variants.find((x) => x.product_id === i.product_id && x.size === i.size);
+      const prod = d.products.find((x) => x.id === i.product_id);
+      v.stock -= i.qty;
+      d.items.push({ id: crypto.randomUUID(), order_id: order.id, product_id: prod.id, variant_id: v.id, title: prod.title, handle: prod.handle, size: i.size, image: prod.images[0] || null, unit_price: i.price, quantity: i.qty });
+    }
+    addEvent(d, order.id, "status", order.status, handover
+      ? `Created in the admin (${p.channel}) — handed over in person and paid`
+      : `Created in the admin (${p.channel}) — to send with PostEx`);
+    return { id: order.id, order_number: order.order_number, status: order.status, total: order.total };
+  });
+  listeners.forEach((fn) => fn({ eventType: "INSERT", new: { id: result.id, order_number: result.order_number, total: result.total, source: { kind: "manual" } } }));
+  return result;
+}
+
 // ---------------------------------------------------------------- detection
 // Mirrors suspected() / detection_groups() / review_orders() in
 // *_order_detection.sql.
@@ -440,6 +525,13 @@ export function stats() {
         const comingBack = (o) => /return/i.test(o.courier_status || "");
         const withCourier = tracked.filter((o) => ["packed", "shipped"].includes(o.status) && !comingBack(o));
         const returned = tracked.filter((o) => o.status === "returned");
+        const handedOver = d.orders.filter((o) => o.status === "delivered" && !o.tracking_number);
+        const fee = 300; // courier_fee_estimate()
+        const recentReturned = returned.filter((o) => new Date(o.courier_returned_at || o.updated_at) > month);
+        const recentHanded = handedOver.filter((o) => new Date(o.updated_at) > month);
+        const sum = (list, f) => list.reduce((n, o) => n + f(o), 0);
+        const earn30 = sum(recentDelivered, amount) + sum(recentHanded, (o) => o.total) - fee * (recentDelivered.length + recentReturned.length);
+        const earnAll = sum(delivered, amount) + sum(handedOver, (o) => o.total) - fee * (delivered.length + returned.length);
         return {
           to_book: d.orders.filter((o) => o.status === "confirmed" && !o.tracking_number).length,
           with_courier_count: withCourier.length,
@@ -452,6 +544,16 @@ export function stats() {
           returned_all_amount: returned.reduce((n, o) => n + amount(o), 0),
           returns_to_check: d.orders.filter((o) => o.status === "returned" && !o.restocked && !o.return_received_at).length,
           returning_count: tracked.filter((o) => ["packed", "shipped"].includes(o.status) && comingBack(o)).length,
+          courier_fee: fee,
+          returned_30d_count: recentReturned.length,
+          handover_30d_count: recentHanded.length,
+          handover_30d_amount: sum(recentHanded, (o) => o.total),
+          handover_all_count: handedOver.length,
+          handover_all_amount: sum(handedOver, (o) => o.total),
+          courier_fees_30d: fee * (recentDelivered.length + recentReturned.length),
+          courier_fees_all: fee * (delivered.length + returned.length),
+          earnings_30d: earn30,
+          earnings_all: earnAll,
         };
       })(),
       low_stock: d.variants

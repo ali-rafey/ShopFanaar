@@ -170,6 +170,14 @@ export async function reviewOrders(ids, verdict) {
   return unwrap(await sb.rpc("review_orders", { p_order_ids: ids, p_verdict: verdict }));
 }
 
+// An order the admin makes: someone at the shop or on the phone.
+// { delivery: "handover" | "postex", channel, customer: { name, phone, address, city },
+//   items: [{ product_id, size, qty, price }], shipping_fee, note } → { id, order_number, status, total }
+export async function createManualOrder(payload) {
+  if (!sb) return (await demo()).createManualOrder(payload);
+  return unwrap(await sb.rpc("create_manual_order", { payload }));
+}
+
 // Orders → Returned: parcels returned to us, with what was in them — newest
 // back first, the ones the admin hasn't checked yet before the rest.
 const RETURN_COLS =
