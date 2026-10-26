@@ -226,7 +226,6 @@ export default function Checkout() {
               <input
                 id="co-note"
                 maxLength={500}
-                placeholder="Landmark, preferred time…"
                 value={form.note}
                 onChange={set("note")}
               />
