@@ -97,14 +97,6 @@ function amountOf(row) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// PostEx times are Pakistan time; add the zone when PostEx leaves it off.
-function pakistanTime(value) {
-  if (!value) return null;
-  const s = String(value);
-  const t = Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}+05:00`);
-  return Number.isNaN(t) ? null : new Date(t).toISOString();
-}
-
 // The day as people in Pakistan read it, e.g. "21 Oct".
 const pkDay = (iso) => {
   const t = Date.parse(iso);
@@ -123,7 +115,7 @@ async function applyProgress(db, order, tracking, row, back = null) {
     p_order_id: order.id,
     p_tracking: tracking,
     p_amount: amountOf(row),
-    p_delivered_at: p.delivered ? pakistanTime(row.orderDeliveryDate) : null,
+    p_delivered_at: p.delivered ? postex.pakistanTime(row.orderDeliveryDate) : null,
   });
   const after = await rpc("courier_status_update", {
     p_order_id: order.id,
@@ -133,7 +125,7 @@ async function applyProgress(db, order, tracking, row, back = null) {
     p_delivered: p.delivered,
   });
   if (back) {
-    return rpc("courier_returned", { p_order_id: order.id, p_tracking: tracking, p_returned_at: pakistanTime(back.returnedAt) });
+    return rpc("courier_returned", { p_order_id: order.id, p_tracking: tracking, p_returned_at: postex.pakistanTime(back.returnedAt) });
   }
   return after;
 }

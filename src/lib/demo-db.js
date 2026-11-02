@@ -377,6 +377,28 @@ export function trackOrders(phone) {
   });
 }
 
+// Mirrors api/track.js with made-up PostEx steps that follow the order's status.
+export function parcelJourney(phone, tracking) {
+  return tx((d) => {
+    const digits = String(phone || "").replace(/\D/g, "").replace(/^(0092|92|0)/, "");
+    const o = d.orders.find((x) => x.tracking_number === tracking && x.phone === "0" + digits);
+    if (!o) fail("We couldn't find that parcel for this number.");
+    const city = String(o.city || "Lahore").toUpperCase();
+    const steps = [["0001", "At Fanaar Warehouse"], ["0036", "At Fanaar Warehouse"]];
+    if (["shipped", "delivered", "returned"].includes(o.status)) {
+      steps.push(["0031", "Departed to PostEx. Warehouse"], ["0003", "Received at FSD Warehouse"], ["0033", `Departed to ${city}`],
+        ["0035", `Arrived at Transit Hub ${city.slice(0, 3)}`], ["0038", "Waiting for Delivery"]);
+    }
+    if (o.status === "delivered") steps.push(["0004", "Enroute for Delivery"], ["0005", "Delivered to Customer"]);
+    if (o.status === "returned") {
+      steps.push(["0004", "Enroute for Delivery"], ["0013", "Attempt Made: CNA(CUSTOMER NOT AVAILABLE)"], ["0039", "Waiting for Return"],
+        ["0037", "Return to FAISALABAD"], ["0006", "Returned at Merchant Warehouse"]);
+    }
+    const start = Date.parse(o.created_at);
+    return steps.map(([code, message], i) => ({ at: new Date(start + (i + 1) * 3 * 3600e3).toISOString(), code, message }));
+  });
+}
+
 export function getOrderPublic(id) {
   return tx((d) => {
     const o = d.orders.find((x) => x.id === id);

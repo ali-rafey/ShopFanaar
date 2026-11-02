@@ -38,9 +38,8 @@ export const infoPages = [
   { to: "/policies/privacy-policy", label: "Privacy" },
 ];
 
-// Primary hero — the black & white portrait from the live store.
-export const heroImage =
-  "/images/hero.webp";
+// Home page hero — the black & white portrait from the live store.
+export const heroImage = "/images/hero.webp";
 
 // Category tiles for the "Shop by Category" board + mega-menu previews.
 export const categoryTiles = [
@@ -82,35 +81,47 @@ export const craft = {
   title: "Knitting & Weaving",
   body: "Autonomy is where the garment begins — at the yarn. Drop needle ribs, micro-block textures and waffle thermals are engineered on the machine, not printed on the surface. The structure is the design.",
   image: "/images/micro-block-drop-needle-knit-3.webp",
+  // The waffle-knit photo beside the Drop Needle pieces on the home page ("2. Texture Knit").
+  homeImage: "/images/texture-knit.webp",
   cta: { label: "Explore Autonomy", to: "/collections/frontpage" },
 };
 
 // Lookbook moodboard (home page). Add new looks to public/images/lookbook/
 // and list them here — the board sizes its columns to the count.
+// `products`: handles of the pieces worn, for "Shop the look" on collection pages.
 export const lookbook = [
-  { src: "/images/lookbook/look-01.webp", width: 720, height: 1280, alt: "Black quarter-zip with pleated black trousers" },
-  { src: "/images/lookbook/look-02.webp", width: 720, height: 1080, alt: "Black quarter-zip and trousers, seated on a studio stool" },
-  { src: "/images/lookbook/look-03.webp", width: 720, height: 1280, alt: "Navy and white stripe tee with pleated black trousers" },
-  { src: "/images/lookbook/look-04.webp", width: 720, height: 1073, alt: "Navy stripe tee with wide black trousers, full look" },
+  { src: "/images/lookbook/look-01.webp", width: 720, height: 1280, alt: "Black quarter-zip with pleated black trousers", products: ["black-quarter-zipper"] },
+  { src: "/images/lookbook/look-02.webp", width: 720, height: 1080, alt: "Black quarter-zip and trousers, seated on a studio stool", products: ["black-quarter-zipper"] },
+  { src: "/images/lookbook/look-03.webp", width: 720, height: 1280, alt: "Navy and white stripe tee with pleated black trousers", products: ["yarn-dyed-stripe-tee"] },
+  { src: "/images/lookbook/look-04.webp", width: 720, height: 1073, alt: "Navy stripe tee with wide black trousers, full look", products: ["yarn-dyed-stripe-tee"] },
 ];
 
-// Small trust/values strip.
-export const values = [
-  { title: "Knit in Faisalabad", body: "Developed and finished in our own facility." },
-  { title: "Structured by design", body: "Texture engineered at the yarn, never printed." },
-  { title: "Considered quantities", body: "Small runs, restocked only when they earn it." },
+// The two looks that open up a collection page after its first rows: a small
+// one on the left, a large one on the right (indexes into `lookbook`).
+export const collectionSpread = { small: 1, large: 2 };
+
+// "More from Fanaar" — the cards at the end of every collection page.
+export const moreFromFanaar = [
+  { image: "/images/about/studio.webp", eyebrow: "Our story", title: "Independent by design", to: "/about" },
+  { image: "/images/about/swatches.webp", eyebrow: "Autonomy", title: "Structure over surface", to: "/about" },
+  { image: "/images/lookbook/look-04.webp", eyebrow: "Lookbook", title: "How we wear it", to: "/products/yarn-dyed-stripe-tee" },
 ];
+
+// The line under the hero — what every order comes with (matches the
+// shipping and exchange policies).
+export const homeTrust = ["Cash on delivery", "3–5 working day delivery", "7-day exchanges", "Knit in Faisalabad"];
 
 // handle -> collection metadata
+// `description`: the line beside the title on the collection page.
 export const collections = [
-  { handle: "all-top", title: "All Top", group: "tops" },
-  { handle: "shirts", title: "Shirts", group: "tops" },
-  { handle: "t-shirts", title: "T-Shirts", group: "tops" },
-  { handle: "quarter-zipper", title: "Sweatshirts", group: "tops" },
-  { handle: "basics", title: "Polo", group: "tops" },
-  { handle: "frontpage", title: "Drop Needle", group: "autonomy" },
-  { handle: "bottoms", title: "Bottoms", group: "bottoms" },
-  { handle: "landing-page-collection", title: "New In", group: "featured" },
+  { handle: "all-top", title: "All Top", group: "tops", description: "Every top we make — knitted, structured and finished in Faisalabad." },
+  { handle: "shirts", title: "Shirts", group: "tops", description: "Knit shirts with the clean line of a shirt and the comfort of a jersey." },
+  { handle: "t-shirts", title: "T-Shirts", group: "tops", description: "Tees with weight and drape, from yarn-dyed and interlock knits." },
+  { handle: "quarter-zipper", title: "Sweatshirts", group: "tops", description: "Quarter-zips and knits in textured fabrics, made to layer." },
+  { handle: "basics", title: "Polo", group: "tops", description: "Piqué polos for every day, in colours that go with everything." },
+  { handle: "frontpage", title: "Drop Needle", group: "autonomy", description: "Texture engineered at the yarn — drop needle ribs and micro-block knits." },
+  { handle: "bottoms", title: "Bottoms", group: "bottoms", description: "Trousers cut to pair with every top." },
+  { handle: "landing-page-collection", title: "New In", group: "featured", description: "The latest pieces from the studio." },
 ];
 
 // The size chart every piece has shown so far. Each product now has its own

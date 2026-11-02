@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
 import { prepareImage } from "../image";
 import { defaultSizeChart } from "../../data/store";
-import { thumb, toSizeChart } from "../../lib/catalog";
+import { thumb, toManufacturing, toSizeChart } from "../../lib/catalog";
 import { ConfirmButton, ErrorBox, money, PageHead, Spinner, useLoad, useToast } from "../ui";
 
 const DEFAULT_DISCLAIMER =
@@ -27,6 +27,13 @@ const chartForm = (c) => ({
 });
 const NO_CHART = { note: "", columns: [], rows: [] };
 
+// Manufacturing table rows a new product starts with; empty ones aren't saved.
+const MFG_LABELS = ["Fabric", "Composition", "Fabric weight", "Construction", "Stitching", "Made in"];
+const mfgForm = (m) => ({
+  text: m?.text || "",
+  rows: m?.rows?.length ? m.rows.map((r) => ({ ...r })) : MFG_LABELS.map((label) => ({ label, value: "" })),
+});
+
 // Editor keeps numbers as strings so fields can be cleared while typing.
 function toForm(p, cost) {
   return {
@@ -43,6 +50,8 @@ function toForm(p, cost) {
     position: String(p.position ?? 0),
     sizes: p.sizes.map((s) => ({ id: s.id, size: s.size, qty: String(s.qty), sku: s.sku || "" })),
     chart: chartForm(p.sizeChart),
+    mfg: mfgForm(p.manufacturing),
+    inspiration: [...(p.inspiration || [])],
   };
 }
 
@@ -60,6 +69,8 @@ const BLANK = {
   position: "0",
   sizes: ["S", "M", "L"].map((size) => ({ size, qty: "0", sku: "" })),
   chart: chartForm(defaultSizeChart),
+  mfg: mfgForm(null),
+  inspiration: [],
 };
 
 const int = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim()) : NaN);
@@ -176,7 +187,8 @@ export default function ProductEdit() {
     );
   };
 
-  async function onFiles(files) {
+  // key: "images" (product photos) or "inspiration" (styling photos)
+  async function onFiles(files, key = "images") {
     const list = [...files];
     if (!list.length) return;
     setUploading((n) => n + list.length);
@@ -184,8 +196,8 @@ export default function ProductEdit() {
       try {
         const photo = await prepareImage(file);
         const url = await api.uploadImage(photo, form.handle || "products");
-        setForm((f) => ({ ...f, images: [...f.images, url] }));
-        setErrors((e) => ({ ...e, images: undefined }));
+        setForm((f) => ({ ...f, [key]: [...f[key], url] }));
+        if (key === "images") setErrors((e) => ({ ...e, images: undefined }));
       } catch (err) {
         toast(err.message || `Couldn't upload ${file.name}.`, "err");
       } finally {
@@ -194,18 +206,18 @@ export default function ProductEdit() {
     }
   }
 
-  function removeImage(url) {
-    set("images", form.images.filter((u) => u !== url));
+  function removeImage(url, key = "images") {
+    set(key, form[key].filter((u) => u !== url));
     // Uploaded during this edit and never saved — delete the file right away.
-    if (!initial.images.includes(url)) api.removeImages([url]);
+    if (!initial[key].includes(url)) api.removeImages([url]);
   }
 
-  function moveImage(i, dir) {
-    const imgs = [...form.images];
+  function moveImage(i, dir, key = "images") {
+    const imgs = [...form[key]];
     const j = i + dir;
     if (j < 0 || j >= imgs.length) return;
     [imgs[i], imgs[j]] = [imgs[j], imgs[i]];
-    set("images", imgs);
+    set(key, imgs);
   }
 
   async function save() {
@@ -231,11 +243,14 @@ export default function ProductEdit() {
         position: int(form.position) || 0,
         sizes: form.sizes.map((s) => ({ id: s.id, size: s.size.trim(), qty: int(s.qty), sku: s.sku })),
         sizeChart: toSizeChart(form.chart),
+        manufacturing: toManufacturing(form.mfg),
+        inspiration: form.inspiration,
       };
       const savedId = await api.saveProduct(product, original);
       const cost = form.cost.trim() ? int(form.cost) : null;
       if (cost !== savedCost) await api.saveProductCost(savedId, cost);
-      const dropped = (original?.images || []).filter((u) => !form.images.includes(u));
+      const kept = new Set([...form.images, ...form.inspiration]);
+      const dropped = [...(original?.images || []), ...(original?.inspiration || [])].filter((u) => !kept.has(u));
       if (dropped.length) api.removeImages(dropped);
       toast(isNew ? "Product created" : "Product saved");
       if (isNew) navigate(`/admin/products/${savedId}`, { replace: true });
@@ -436,6 +451,16 @@ export default function ProductEdit() {
             stockSizes={form.sizes.map((s) => s.size.trim()).filter(Boolean)}
             sources={chartSources}
           />
+
+          <ManufacturingCard mfg={form.mfg} onChange={(mfg) => set("mfg", mfg)} />
+
+          <InspirationCard
+            photos={form.inspiration}
+            uploading={uploading}
+            onFiles={(files) => onFiles(files, "inspiration")}
+            onRemove={(url) => removeImage(url, "inspiration")}
+            onMove={(i, dir) => moveImage(i, dir, "inspiration")}
+          />
         </div>
 
         <div className="adm-detail-side">
@@ -518,6 +543,93 @@ export default function ProductEdit() {
         </div>
       </div>
     </div>
+  );
+}
+
+// "Manufacturing" on the product page: a paragraph and a table.
+function ManufacturingCard({ mfg, onChange }) {
+  const setRow = (i, k, v) => onChange({ ...mfg, rows: mfg.rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)) });
+  const missing = MFG_LABELS.filter((l) => !mfg.rows.some((r) => r.label.trim().toLowerCase() === l.toLowerCase()));
+  return (
+    <section className="adm-card">
+      <div className="adm-card-head">
+        <h2>Manufacturing</h2>
+        <span className="adm-hint">The “Manufacturing” chapter on the product page. Leave empty to hide it.</span>
+      </div>
+      <Field label="How it's made" hint="A short paragraph — the fabric, the knit, where and how it's finished.">
+        <textarea rows={4} value={mfg.text} onChange={(e) => onChange({ ...mfg, text: e.target.value })} />
+      </Field>
+      <div className="adm-mfg-rows">
+        <div className="adm-mfg-head" aria-hidden="true">
+          <span>Detail</span>
+          <span>Value</span>
+        </div>
+        {mfg.rows.map((r, i) => (
+          <div className="adm-mfg-row" key={i}>
+            <input value={r.label} placeholder="e.g. Fabric" aria-label="Detail" onChange={(e) => setRow(i, "label", e.target.value)} />
+            <input value={r.value} placeholder="e.g. Waffle thermal knit" aria-label={`${r.label || "Detail"} value`} onChange={(e) => setRow(i, "value", e.target.value)} />
+            <button
+              type="button"
+              className="adm-link danger"
+              aria-label={`Remove ${r.label || "row"}`}
+              onClick={() => onChange({ ...mfg, rows: mfg.rows.filter((_, j) => j !== i) })}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="adm-btns adm-mfg-add">
+        <button type="button" className="adm-chip" onClick={() => onChange({ ...mfg, rows: [...mfg.rows, { label: "", value: "" }] })}>
+          + Add a row
+        </button>
+        {missing.map((l) => (
+          <button key={l} type="button" className="adm-chip" onClick={() => onChange({ ...mfg, rows: [...mfg.rows, { label: l, value: "" }] })}>
+            + {l}
+          </button>
+        ))}
+      </div>
+      <p className="adm-hint">Rows without a value aren&apos;t shown on the website.</p>
+    </section>
+  );
+}
+
+// "Inspiration" on the product page: styling photos.
+function InspirationCard({ photos, uploading, onFiles, onRemove, onMove }) {
+  const fileRef = useRef(null);
+  return (
+    <section className="adm-card">
+      <div className="adm-card-head">
+        <h2>Inspiration</h2>
+        <span className="adm-hint">Styling photos for the “Inspiration” chapter — the piece worn and styled.</span>
+      </div>
+      <div className="adm-images">
+        {photos.map((url, i) => (
+          <figure key={url} className="adm-image">
+            <img src={thumb(url)} alt={`Inspiration ${i + 1}`} />
+            <div className="adm-image-tools">
+              <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label="Move left">←</button>
+              <button type="button" onClick={() => onMove(i, 1)} disabled={i === photos.length - 1} aria-label="Move right">→</button>
+              <button type="button" onClick={() => onRemove(url)} aria-label="Remove photo">✕</button>
+            </div>
+          </figure>
+        ))}
+        <button type="button" className="adm-image add" onClick={() => fileRef.current?.click()} disabled={uploading > 0}>
+          + Add photos
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            onFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+    </section>
   );
 }
 

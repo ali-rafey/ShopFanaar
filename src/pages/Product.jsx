@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { shop } from "../data/store";
 import { formatPrice, thumb } from "../lib/catalog";
+import { swatchColour } from "../lib/colours";
 import { useCatalog } from "../context/CatalogContext";
 import { useCart } from "../context/CartContext";
 import { useSaved } from "../context/SavedContext";
 import { trackViewContent } from "../lib/pixel";
-import ProductCard, { Heart } from "../components/ProductCard";
-import Reveal from "../components/Reveal";
+import { Heart } from "../components/ProductCard";
+import ListingCard from "../components/ListingCard";
 import { ProductSkeleton } from "../components/Skeleton";
+
+// A product, laid out like a catalogue page: the photos down the left (a
+// swipeable strip on phones), and beside them a panel that stays in view —
+// name, price, a line about the piece, colour, size & fit, shipping, and
+// "Select size", which opens a side sheet with the sizes and Add to cart.
+// Below: numbered chapters that fold open (details, manufacturing and
+// inspiration — both filled in from the product editor — size & fit, care,
+// shipping & returns, related pieces).
+
+const CARE =
+  "Cold machine wash with like colours. Do not bleach. Dry flat in shade to preserve the knit structure. Warm iron on reverse.";
 
 export default function Product() {
   const { handle } = useParams();
@@ -18,32 +29,37 @@ export default function Product() {
   const { isSaved, toggle } = useSaved();
 
   const [size, setSize] = useState(null);
-  const [openPanel, setOpenPanel] = useState("details");
   const [shot, setShot] = useState(0);
+  const [sheet, setSheet] = useState(null); // "size" | "fit" | "shipping"
   const [showBar, setShowBar] = useState(false);
   const galleryRef = useRef(null);
   const actionsRef = useRef(null);
 
-  // Show the sticky buy bar only once the real Add-to-cart has scrolled away.
-  // If the observer never fires the bar simply stays hidden — the in-page
-  // button is always available, so this can't strand the user.
+  // The sticky buy bar (phones) only once the real button has scrolled away.
   useEffect(() => {
     const el = actionsRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      ([e]) => setShowBar(!e.isIntersecting && e.boundingClientRect.top < 0),
-      { threshold: 0 }
-    );
+    const io = new IntersectionObserver(([e]) => setShowBar(!e.isIntersecting && e.boundingClientRect.top < 0), {
+      threshold: 0,
+    });
     io.observe(el);
     return () => io.disconnect();
-  }, [handle]);
+  }, [handle, product?.id]);
 
   useEffect(() => {
     setSize(null);
     setShot(0);
+    setSheet(null);
     window.scrollTo(0, 0);
     if (galleryRef.current) galleryRef.current.scrollLeft = 0;
   }, [handle]);
+
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (e) => e.key === "Escape" && setSheet(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheet]);
 
   const productId = product?.id;
   useEffect(() => {
@@ -57,9 +73,7 @@ export default function Product() {
     return (
       <div className="wrap empty-state" style={{ padding: "120px 0" }}>
         <h1 className="empty-lead">Product not found</h1>
-        <p className="empty-sub">
-          This piece may have moved or sold out permanently.
-        </p>
+        <p className="empty-sub">This piece may have moved or sold out permanently.</p>
         <Link to="/collections/all-top" className="btn-solid">
           Back to shop
         </Link>
@@ -67,284 +81,350 @@ export default function Product() {
     );
   }
 
-  const selected = product.sizes.find((s) => s.size === size);
-  const canAdd = selected && selected.qty > 0;
   const saved = isSaved(product.id);
   const chart = product.sizeChart;
-  const related = catalog.getRelated(product, 3);
+  const related = catalog.getRelated(product, 4);
   const colorways = catalog.getColorways(product);
-
-  const primary = product.collections[0];
-  const crumb = catalog.collections.find((c) => c.handle === primary);
-
-  // When colourways exist the swatches carry the colour, so the heading
-  // drops the " - Colour" suffix instead of wrapping on the hyphen.
+  const multi = colorways.length > 1;
   const activeColor = colorways.find((c) => c.id === product.id)?.colorName;
-  const heading =
-    colorways.length > 1 ? product.title.split(" - ")[0].trim() : product.title;
+  // With colourways the swatches carry the colour, so the name drops " - Colour".
+  const heading = multi ? product.title.split(" - ")[0].trim() : product.title;
+  const soldOut = product.sizes.every((s) => s.qty <= 0);
+  const summary = (product.description.match(/^[\s\S]*?[.!?](?=\s|$)/) || [product.description])[0].trim();
+  const crumb = catalog.collections.find((c) => c.handle === product.collections[0]);
 
-  // Mobile carousel dot tracking
   const onGalleryScroll = (e) => {
     const el = e.currentTarget;
     if (el.clientWidth === 0) return;
     setShot(Math.round(el.scrollLeft / el.clientWidth));
   };
-  const goToShot = (i) => {
-    const el = galleryRef.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-    setShot(i);
-  };
+
+  const sections = [
+    {
+      id: "details",
+      title: "Details",
+      body: (
+        <div className="pd-details">
+          <p className="pd-lead">{product.description}</p>
+          {product.disclaimer && <p className="pd-disclaimer">{product.disclaimer}</p>}
+        </div>
+      ),
+    },
+    product.manufacturing && {
+      id: "manufacturing",
+      title: "Manufacturing",
+      body: (
+        <div className="pd-details">
+          {product.manufacturing.text && <p className="pd-mfg-text">{product.manufacturing.text}</p>}
+          {product.manufacturing.rows.length > 0 && (
+            <dl className="pd-spec">
+              {product.manufacturing.rows.map((r) => (
+                <div key={r.label}>
+                  <dt>{r.label}</dt>
+                  <dd>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      ),
+    },
+    product.inspiration.length > 0 && {
+      id: "inspiration",
+      title: "Inspiration",
+      body: (
+        <div className="pd-inspo">
+          {product.inspiration.map((url, i) => (
+            <figure key={url}>
+              <img src={thumb(url)} alt={`${heading} — styled ${i + 1}`} loading="lazy" />
+            </figure>
+          ))}
+        </div>
+      ),
+    },
+    chart && { id: "fit", title: "Size & Fit", body: <SizeChart chart={chart} /> },
+    { id: "care", title: "Care", body: <p className="pd-text">{CARE}</p> },
+    { id: "shipping", title: "Shipping & Returns", body: <ShippingInfo /> },
+    related.length > 0 && {
+      id: "related",
+      title: "Related pieces",
+      body: (
+        <div className="cl-grid is-grid">
+          {related.map((p) => (
+            <ListingCard key={p.id} product={p} colorways={catalog.getColorways(p)} />
+          ))}
+        </div>
+      ),
+    },
+  ].filter(Boolean);
 
   return (
     <>
-      <div className="wrap">
-        <nav className="crumbs" aria-label="Breadcrumb">
-          <Link to="/">Home</Link>
-          <span aria-hidden="true">/</span>
-          {crumb && (
-            <>
-              <Link to={`/collections/${crumb.handle}`}>{crumb.title}</Link>
-              <span aria-hidden="true">/</span>
-            </>
-          )}
-          <span className="current">{product.title}</span>
-        </nav>
-      </div>
-
-      <div className="wrap pdp">
-        <div className="pdp-media">
-          <div
-            className="pdp-gallery"
-            ref={galleryRef}
-            onScroll={onGalleryScroll}
-          >
+      <div className="pd">
+        <div className="pd-media">
+          <div className="pd-gallery" ref={galleryRef} onScroll={onGalleryScroll}>
             {product.images.map((img, i) => (
-              <figure className="pdp-shot" key={img}>
-                <img
-                  src={img}
-                  alt={`${product.title} — view ${i + 1}`}
-                  loading={i === 0 ? "eager" : "lazy"}
-                />
+              <figure className="pd-shot" key={img}>
+                <img src={img} alt={`${product.title} — view ${i + 1}`} loading={i === 0 ? "eager" : "lazy"} />
               </figure>
             ))}
           </div>
           {product.images.length > 1 && (
-            <div className="pdp-dots" role="tablist" aria-label="Product images">
-              {product.images.map((img, i) => (
-                <button
-                  key={img}
-                  className={`dot ${i === shot ? "active" : ""}`}
-                  aria-label={`Go to image ${i + 1}`}
-                  aria-selected={i === shot}
-                  role="tab"
-                  onClick={() => goToShot(i)}
-                />
-              ))}
+            <div className="pd-progress" aria-hidden="true">
+              <span
+                style={{
+                  width: `${100 / product.images.length}%`,
+                  transform: `translateX(${shot * 100}%)`,
+                }}
+              />
             </div>
           )}
         </div>
 
-        <div className="pdp-info">
-          <div className="vendor">{shop.name}</div>
-          <h1>{heading}</h1>
-          <div className="pdp-price">
-            {product.compareAtPrice > product.price && (
-              <s className="was">{formatPrice(product.compareAtPrice)}</s>
-            )}
-            {formatPrice(product.price)}
-          </div>
-
-          {colorways.length > 1 && (
-            <div className="colorways">
-              <span className="size-label">Colour: {activeColor}</span>
-              <div className="swatches">
-                {colorways.map((c) => (
-                  <Link
-                    key={c.id}
-                    to={`/products/${c.handle}`}
-                    className={`swatch ${c.id === product.id ? "active" : ""}`}
-                    title={c.colorName}
-                    aria-label={c.colorName}
-                  >
-                    <img src={thumb(c.images[0])} alt="" aria-hidden="true" />
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="size-row">
-            <span className="size-label">Size{size ? `: ${size}` : ""}</span>
-            {chart && (
-              <button
-                className="size-guide-btn"
-                onClick={() =>
-                  setOpenPanel(openPanel === "sizing" ? null : "sizing")
-                }
-              >
-                Size guide
-              </button>
-            )}
-          </div>
-
-          <div className="sizes">
-            {product.sizes.map((s) => (
-              <button
-                key={s.size}
-                className={`size ${size === s.size ? "active" : ""} ${
-                  s.qty === 0 ? "disabled" : ""
-                }`}
-                disabled={s.qty === 0}
-                aria-pressed={size === s.size}
-                onClick={() => setSize(s.size)}
-              >
-                {s.size}
-              </button>
-            ))}
-          </div>
-
-          {selected && selected.qty > 0 && selected.qty <= 3 && (
-            <p className="stock-note">
-              Only {selected.qty} left in size {selected.size}
-            </p>
-          )}
-
-          <div className="pdp-actions" ref={actionsRef}>
-            <button
-              className="btn-solid full"
-              disabled={!canAdd}
-              onClick={() => add(product, size)}
-            >
-              {!size ? "Select a size" : !canAdd ? "Sold out" : "Add to cart"}
-            </button>
-            <button
-              className={`btn-outline save ${saved ? "is-saved" : ""}`}
-              onClick={() => toggle(product.id, product)}
-              aria-pressed={saved}
-            >
-              <Heart filled={saved} />
-              {saved ? "Saved" : "Save"}
-            </button>
-          </div>
-
-          <ul className="pdp-assurances">
-            <li>Dispatched in 1–2 working days from Faisalabad</li>
-            <li>Exchanges within 7 days on unworn pieces</li>
-          </ul>
-
-          <div className="accordion">
-            <Panel id="details" title="Details" open={openPanel === "details"} onToggle={setOpenPanel}>
-              <p>{product.description}</p>
-              {product.disclaimer && (
-                <p className="disclaimer">
-                  <strong>Disclaimer:</strong> {product.disclaimer}
-                </p>
-              )}
-            </Panel>
-
-            {chart && (
-              <Panel id="sizing" title="Size & fit" open={openPanel === "sizing"} onToggle={setOpenPanel}>
-                {chart.note && <p>{chart.note}</p>}
-                {chart.rows.length > 0 && (
-                  <div className="size-table-wrap">
-                    <table className="size-table">
-                      <thead>
-                        <tr>
-                          <th>Size</th>
-                          {chart.columns.map((c, i) => <th key={i}>{c}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chart.rows.map((r, i) => (
-                          <tr key={i}>
-                            <td>{r.size}</td>
-                            {r.values.map((v, i) => <td key={i}>{v || "—"}</td>)}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+        <div className="pd-panel">
+          <div className="pd-panel-inner">
+            <div className="pd-top">
+              <nav className="pd-crumbs" aria-label="Breadcrumb">
+                <Link to="/">Home</Link>
+                {crumb && (
+                  <>
+                    {" / "}
+                    <Link to={`/collections/${crumb.handle}`}>{crumb.title}</Link>
+                  </>
                 )}
-              </Panel>
-            )}
+              </nav>
+              <div className="pd-titlerow">
+                <h1>{heading}</h1>
+                <button
+                  type="button"
+                  className={`pd-save ${saved ? "is-saved" : ""}`}
+                  onClick={() => toggle(product.id, product)}
+                  aria-pressed={saved}
+                  aria-label={saved ? "Remove from saved" : "Save this piece"}
+                >
+                  <Heart filled={saved} />
+                </button>
+              </div>
+              <div className="pd-price">
+                {product.compareAtPrice > product.price && <s>{formatPrice(product.compareAtPrice)}</s>}
+                {formatPrice(product.price)}
+              </div>
+              <p className="pd-summary">{summary}</p>
+            </div>
 
-            <Panel id="care" title="Care" open={openPanel === "care"} onToggle={setOpenPanel}>
-              <p>
-                Cold machine wash with like colours. Do not bleach. Dry flat in
-                shade to preserve the knit structure. Warm iron on reverse.
-              </p>
-            </Panel>
+            <div className="pd-bottom">
+              <ul className="pd-rows">
+                {multi && (
+                  <li className="pd-row pd-colour">
+                    <span>{activeColor}</span>
+                    <span className="pd-swatches" aria-label="Colours">
+                      {colorways.map((c) => {
+                        const hex = swatchColour(c.colorName);
+                        return (
+                          <Link
+                            key={c.id}
+                            to={`/products/${c.handle}`}
+                            className={`pd-swatch ${c.id === product.id ? "is-current" : ""}`}
+                            title={c.colorName}
+                            aria-label={c.colorName}
+                            style={hex ? { "--swatch": hex } : undefined}
+                          >
+                            {!hex && <img src={thumb(c.images[0])} alt="" />}
+                          </Link>
+                        );
+                      })}
+                    </span>
+                  </li>
+                )}
+                {chart && (
+                  <li>
+                    <button type="button" className="pd-row" onClick={() => setSheet("fit")}>
+                      <span>Size &amp; Fit</span>
+                      <span className="pd-row-hint">Size guide, measurements</span>
+                      <span aria-hidden="true">›</span>
+                    </button>
+                  </li>
+                )}
+                <li>
+                  <button type="button" className="pd-row" onClick={() => setSheet("shipping")}>
+                    <span>Shipping &amp; Returns</span>
+                    <span className="pd-row-hint">Cash on delivery, 7-day exchanges</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                </li>
+              </ul>
 
-            <Panel id="shipping" title="Shipping &amp; returns" open={openPanel === "shipping"} onToggle={setOpenPanel}>
-              <p>
-                Dispatched within 1–2 working days from Faisalabad. Delivery
-                across Pakistan in 3–5 working days. Exchanges accepted within
-                7 days of delivery on unworn pieces with tags intact.
-              </p>
-              <p>
-                <Link to="/policies/shipping-policy">Shipping policy</Link> ·{" "}
-                <Link to="/policies/refund-policy">Exchanges &amp; returns</Link>
-              </p>
-            </Panel>
+              <div ref={actionsRef}>
+                <button type="button" className="pd-buy" disabled={soldOut} onClick={() => setSheet("size")}>
+                  {soldOut ? "Sold out" : size ? `Size ${size} · Add to cart` : "Select size"}
+                </button>
+              </div>
+              <p className="pd-assure">Dispatched in 1–2 working days from Faisalabad</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {related.length > 0 && (
-        <section className="wrap section">
-          <Reveal>
-            <div className="section-head">
-              <h2>You may also like</h2>
-              <Link to="/collections/all-top">View all</Link>
-            </div>
-          </Reveal>
-          <div className="grid">
-            {related.map((p, i) => (
-              <ProductCard key={p.id} product={p} index={i} />
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="pd-sections">
+        {sections.map((s, i) => (
+          <Chapter key={s.id} number={i + 1} title={s.title} defaultOpen={["details", "manufacturing", "related"].includes(s.id)}>
+            {s.body}
+          </Chapter>
+        ))}
+      </div>
 
-      {/* Sticky mobile buy bar */}
-      <div className={`buybar ${showBar ? "show" : ""}`}>
+      <Sheet open={sheet === "size"} title="Select size" onClose={() => setSheet(null)}>
+        <SizePicker
+          product={product}
+          size={size}
+          onSize={setSize}
+          chart={chart}
+          onAdd={() => {
+            setSheet(null);
+            add(product, size);
+          }}
+        />
+      </Sheet>
+      <Sheet open={sheet === "fit"} title="Size & fit" onClose={() => setSheet(null)}>
+        {chart && <SizeChart chart={chart} />}
+      </Sheet>
+      <Sheet open={sheet === "shipping"} title="Shipping & returns" onClose={() => setSheet(null)}>
+        <ShippingInfo />
+      </Sheet>
+
+      {/* Sticky buy bar on phones, once the real button has scrolled away. */}
+      <div className={`buybar ${showBar && !sheet ? "show" : ""}`}>
         <div className="buybar-info">
           <span className="buybar-title">{product.title}</span>
           <span className="buybar-price">{formatPrice(product.price)}</span>
         </div>
-        <button
-          className="btn-solid"
-          disabled={!canAdd}
-          onClick={() => {
-            if (canAdd) add(product, size);
-            else
-              document
-                .querySelector(".sizes")
-                ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }}
-        >
-          {!size ? "Select size" : !canAdd ? "Sold out" : "Add"}
+        <button className="btn-solid" disabled={soldOut} onClick={() => setSheet("size")}>
+          {soldOut ? "Sold out" : "Select size"}
         </button>
       </div>
     </>
   );
 }
 
-function Panel({ id, title, open, onToggle, children }) {
+// A numbered chapter that folds open and shut.
+function Chapter({ number, title, defaultOpen, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`panel ${open ? "open" : ""}`}>
-      <button
-        className="panel-head"
-        aria-expanded={open}
-        onClick={() => onToggle(open ? null : id)}
-      >
-        <span dangerouslySetInnerHTML={{ __html: title }} />
-        <span className="panel-icon" aria-hidden="true" />
+    <section className={`pd-chapter ${open ? "is-open" : ""}`}>
+      <button type="button" className="pd-chapter-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span>
+          {number}. {title}
+        </span>
+        <span className="pd-chapter-icon" aria-hidden="true">
+          {open ? "×" : "+"}
+        </span>
       </button>
-      <div className="panel-body">
-        <div className="panel-inner">{children}</div>
+      {open && <div className="pd-chapter-body">{children}</div>}
+    </section>
+  );
+}
+
+// A side sheet, like the cart.
+function Sheet({ open, title, onClose, children }) {
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? "open" : ""}`} onClick={onClose} />
+      <aside className={`drawer pd-sheet ${open ? "open" : ""}`} aria-hidden={!open} aria-label={title}>
+        <div className="drawer-head">
+          <h3>{title}</h3>
+          <button className="icon-btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="drawer-body">{open && children}</div>
+      </aside>
+    </>
+  );
+}
+
+function SizePicker({ product, size, onSize, chart, onAdd }) {
+  const [guide, setGuide] = useState(false);
+  const selected = product.sizes.find((s) => s.size === size);
+  const canAdd = selected && selected.qty > 0;
+  return (
+    <div className="pd-sizes">
+      <div className="pd-size-grid">
+        {product.sizes.map((s) => (
+          <button
+            key={s.size}
+            type="button"
+            className={`pd-size ${size === s.size ? "is-on" : ""}`}
+            disabled={s.qty <= 0}
+            aria-pressed={size === s.size}
+            onClick={() => onSize(s.size)}
+          >
+            {s.size}
+            <small>{s.qty <= 0 ? "Sold out" : s.qty <= 3 ? `${s.qty} left` : ""}</small>
+          </button>
+        ))}
       </div>
+      {chart && (
+        <>
+          <button type="button" className="pd-guide-btn" onClick={() => setGuide(!guide)} aria-expanded={guide}>
+            {guide ? "Hide size guide" : "Size guide"}
+          </button>
+          {guide && <SizeChart chart={chart} />}
+        </>
+      )}
+      <div className="pd-sheet-foot">
+        <button type="button" className="pd-buy" disabled={!canAdd} onClick={onAdd}>
+          {size ? (canAdd ? `Add to cart · ${formatPrice(product.price)}` : "Sold out") : "Choose a size"}
+        </button>
+        <p className="pd-assure">Cash on delivery. Exchanges within 7 days on unworn pieces.</p>
+      </div>
+    </div>
+  );
+}
+
+function SizeChart({ chart }) {
+  return (
+    <div className="pd-chart">
+      {chart.note && <p className="pd-text">{chart.note}</p>}
+      {chart.rows.length > 0 && (
+        <div className="size-table-wrap">
+          <table className="size-table">
+            <thead>
+              <tr>
+                <th>Size</th>
+                {chart.columns.map((c, i) => (
+                  <th key={i}>{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {chart.rows.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.size}</td>
+                  {r.values.map((v, j) => (
+                    <td key={j}>{v || "—"}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShippingInfo() {
+  return (
+    <div className="pd-text">
+      <p>
+        Cash on delivery across Pakistan. Dispatched within 1–2 working days from Faisalabad; delivery in 3–5 working
+        days.
+      </p>
+      <p>Exchanges within 7 days of delivery on unworn pieces with tags intact.</p>
+      <p>
+        <Link to="/policies/shipping-policy">Shipping policy</Link> ·{" "}
+        <Link to="/policies/refund-policy">Exchanges &amp; returns</Link> · <Link to="/track">Track your order</Link>
+      </p>
     </div>
   );
 }

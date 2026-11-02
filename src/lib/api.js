@@ -74,7 +74,7 @@ async function rest(path, body) {
 }
 
 const CATALOG_SELECT =
-  "id,handle,title,description,disclaimer,price,compare_at_price,images,collections,status,position,size_chart," +
+  "id,handle,title,description,disclaimer,price,compare_at_price,images,collections,status,position,size_chart,manufacturing,inspiration," +
   "product_variants(id,size,stock,sku,position)";
 
 export function bundledCatalog() {
@@ -132,6 +132,21 @@ export async function trackOrders(phone) {
   if (BACKEND === "static") throw new ApiError("Order tracking isn't available yet.");
   if (BACKEND === "demo") return (await loadDemo()).trackOrders(phone);
   return rest("rpc/track_orders", { p_phone: phone });
+}
+
+// A PostEx parcel's live journey for the Track page (api/track.js), checked
+// against the mobile number it was booked to. → [{ at, code, message }], oldest first.
+export async function parcelJourney(phone, tracking) {
+  if (BACKEND === "static") return [];
+  if (BACKEND === "demo") return (await loadDemo()).parcelJourney(phone, tracking);
+  const res = await fetch("/api/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, tracking }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data.error || "Live tracking isn't available right now.");
+  return data.events || [];
 }
 
 // Newsletter. Resolves "subscribed" or "already".

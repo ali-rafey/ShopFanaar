@@ -341,6 +341,8 @@ export async function saveProduct(product, original) {
     price: product.price,
     compare_at_price: product.compareAtPrice || null,
     size_chart: product.sizeChart ?? null,
+    manufacturing: product.manufacturing ?? null,
+    inspiration: product.inspiration || [],
     images: product.images,
     collections: product.collections,
     status: product.status,
@@ -374,7 +376,7 @@ export async function saveProduct(product, original) {
 export async function deleteProduct(product) {
   if (!sb) return (await demo()).deleteProduct(product.id);
   unwrap(await sb.from("products").delete().eq("id", product.id));
-  await removeImages(product.images);
+  await removeImages([...product.images, ...(product.inspiration || [])]);
 }
 
 // photo: { large, small } from prepareImage(). Saved as <name>.l.<ext> and

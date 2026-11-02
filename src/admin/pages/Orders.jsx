@@ -100,9 +100,10 @@ export default function Orders() {
   }, [list, refreshStats]);
 
   // ---------------------------------------------------------- status change
-  // The admin sets Pending, Confirmed or Cancelled. Confirming books the
-  // orders with PostEx straight away; cancelling a booked parcel cancels it at
-  // PostEx too (only possible before pickup). Everything else comes from PostEx.
+  // The admin sets Pending, Confirmed or Cancelled. Booking with PostEx is a
+  // separate step (Book with PostEx), whenever the admin is ready; cancelling a
+  // booked parcel cancels it at PostEx too (only before pickup). Everything
+  // else comes from PostEx.
   async function applyStatus(ids, next) {
     setConfirm(null);
     setSheet(null);
@@ -135,7 +136,6 @@ export default function Orders() {
     if (selecting) clearSelection();
     else if (ids.length > 1) setSelected(new Set());
     refresh();
-    if (next === "confirmed" && changed.length) setBooking({ ids: changed.map((o) => o.id), auto: true });
   }
   const requestStatus = (ids, next) => {
     if (!next || !ids.length) return;
@@ -512,12 +512,12 @@ export default function Orders() {
       {sheet === "status" && (
         <ActionSheet
           title={`Change status of ${what}`}
-          message="After confirming, the status comes from PostEx."
+          message="Confirmed orders wait in Confirmed until you book them with PostEx."
           onClose={() => setSheet(null)}
           actions={ADMIN_STATUSES.map((s) => ({
             label:
               s === "confirmed"
-                ? "Confirm & book with PostEx"
+                ? ids.length === 1 ? "Confirm order" : "Confirm orders"
                 : s === "cancelled"
                   ? ids.length === 1 ? "Cancel order" : "Cancel orders"
                   : `Back to ${STATUS[s].label.toLowerCase()}`,
@@ -716,7 +716,7 @@ function StatusSelect({ status, onChange, disabled, label, placeholder }) {
       )}
       {options.map((s) => (
         <option key={s} value={s} disabled={!ADMIN_STATUSES.includes(s)}>
-          {s === "confirmed" && status !== "confirmed" ? "Confirm & book" : STATUS[s].label}
+          {s === "confirmed" && status !== "confirmed" ? "Confirm" : STATUS[s].label}
         </option>
       ))}
     </select>

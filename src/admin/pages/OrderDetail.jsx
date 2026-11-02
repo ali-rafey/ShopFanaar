@@ -205,10 +205,9 @@ function StatusPanel({ order: o, items, busy, act, onDeleted }) {
       setNote("");
     }, `Order marked ${STATUS[status].label.toLowerCase()}`);
 
-  // Confirming books the order with PostEx straight away.
-  const confirmAndBook = async () => {
-    if (await move("confirmed")) setBooking({ auto: true });
-  };
+  // Confirming and booking are separate: confirm after calling the customer,
+  // book with PostEx whenever you're ready (here, or many at once in Orders).
+  const confirm = () => move("confirmed");
   // A booked parcel PostEx hasn't picked up can still be cancelled — there too.
   const cancelOrder = () =>
     act(async () => {
@@ -296,8 +295,8 @@ function StatusPanel({ order: o, items, busy, act, onDeleted }) {
               />
               <div className="adm-btns">
                 {o.status === "pending" ? (
-                  <button className="adm-btn primary" disabled={busy} onClick={confirmAndBook}>
-                    Confirm &amp; book with PostEx
+                  <button className="adm-btn primary" disabled={busy} onClick={confirm}>
+                    Confirm order
                   </button>
                 ) : (
                   <button className="adm-btn primary" disabled={busy} onClick={() => setBooking({ auto: false })}>

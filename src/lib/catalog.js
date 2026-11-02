@@ -55,6 +55,8 @@ export function toProduct(row) {
     status: row.status,
     position: row.position ?? 0,
     sizeChart: toSizeChart(row.size_chart),
+    manufacturing: toManufacturing(row.manufacturing),
+    inspiration: Array.isArray(row.inspiration) ? row.inspiration.filter(Boolean) : [],
     sizes: (row.product_variants || [])
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -73,6 +75,18 @@ export function toSizeChart(raw) {
     .filter((r) => r.size);
   const note = text(raw.note);
   return note || rows.length ? { note, columns, rows } : null;
+}
+
+// How a product is made: a paragraph and label/value rows (Fabric, Composition,
+// Stitching…), tidied. null when there is nothing to show.
+export function toManufacturing(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const text = (v) => (v == null ? "" : String(v).trim());
+  const rows = (Array.isArray(raw.rows) ? raw.rows : [])
+    .map((r) => ({ label: text(r?.label), value: text(r?.value) }))
+    .filter((r) => r.label && r.value);
+  const body = text(raw.text);
+  return body || rows.length ? { text: body, rows } : null;
 }
 
 export function toSettings(row) {

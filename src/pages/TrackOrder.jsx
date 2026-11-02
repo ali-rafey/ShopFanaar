@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { shop } from "../data/store";
-import { trackOrders } from "../lib/api";
+import { parcelJourney, trackOrders } from "../lib/api";
 import { formatPrice, thumb } from "../lib/catalog";
 import { FLOW, STATUS } from "../lib/orderStatus";
+import { journey, parcelStage } from "../lib/parcel";
 
 // "Track your order": the shopper enters the mobile number they ordered with
 // and sees their recent orders — status, items and the courier's tracking
 // number. Deliberately no name or address (anyone can type any number); the
 // database also rate-limits lookups. See supabase/migrations/*_track_orders.sql.
+//
+// Parcels booked with PostEx also show where they actually are — PostEx's own
+// tracking steps (api/track.js), in plain words (src/lib/parcel.js).
 
 const DETAILS_KEY = "fanaar-checkout-details"; // saved at checkout, if the shopper chose to
 const POSTEX_TRACKING = "https://postex.pk/tracking";
@@ -33,6 +37,21 @@ function savedPhone() {
 }
 
 const day = (iso) => new Date(iso).toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" });
+const when = (iso) =>
+  new Date(iso).toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Karachi",
+  });
+
+// The steps a PostEx parcel goes through, as the shopper sees them.
+const PARCEL_STEPS = ["Order placed", "Confirmed", "With PostEx", "Out for delivery", "Delivered"];
+const PARCEL_REACHED = { booked: 1, moving: 2, out: 3, attempted: 3, delivered: 4 };
+const LIVE = new Set(["packed", "shipped", "delivered", "returned"]);
 
 export default function TrackOrder() {
   const [phone, setPhone] = useState(savedPhone);
@@ -100,7 +119,7 @@ export default function TrackOrder() {
         ) : (
           <div className="track-list">
             {result.orders.map((o) => (
-              <TrackedOrder key={o.order_number} order={o} />
+              <TrackedOrder key={o.order_number} order={o} phone={result.phone} />
             ))}
             <p className="track-help">
               Questions about an order?{" "}
@@ -115,11 +134,17 @@ export default function TrackOrder() {
   );
 }
 
-function TrackedOrder({ order: o }) {
+function TrackedOrder({ order: o, phone }) {
   const [copied, setCopied] = useState(false);
-  const stopped = o.status === "cancelled" || o.status === "returned";
+  const live = useParcel(o, phone);
+  const stage = live.events?.length ? parcelStage(live.events) : null;
+  const steps = live.events?.length ? journey(live.events) : [];
+
+  const stopped = stage ? stage === "returning" || stage === "returned" : o.status === "cancelled" || o.status === "returned";
   const reached = FLOW.indexOf(o.status);
-  const next = o.status === "shipped" && o.payment_status === "paid" ? "With the courier now." : NEXT[o.status];
+  let title = STATUS[o.status]?.customer || o.status;
+  let next = o.status === "shipped" && o.payment_status === "paid" ? "With the courier now." : NEXT[o.status];
+  if (stage) [title, next] = parcelHeadline(stage, steps, o);
 
   async function copy() {
     try {
@@ -138,7 +163,7 @@ function TrackedOrder({ order: o }) {
           <span className="eyebrow">
             Order #{o.order_number} · {day(o.created_at)}
           </span>
-          <h2>{STATUS[o.status]?.customer || o.status}</h2>
+          <h2>{title}</h2>
           <p>{next}</p>
         </div>
         <div className="track-total">
@@ -147,16 +172,33 @@ function TrackedOrder({ order: o }) {
         </div>
       </header>
 
-      {!stopped && (
-        <ol className="order-steps">
-          {FLOW.map((s, i) => (
-            <li key={s} className={i <= reached ? "done" : ""} aria-current={i === reached ? "step" : undefined}>
-              <span className="dot" />
-              {STATUS[s].customer}
-            </li>
-          ))}
-        </ol>
-      )}
+      {!stopped &&
+        (stage ? (
+          <ol className="order-steps">
+            {PARCEL_STEPS.map((label, i) => (
+              <li
+                key={label}
+                className={i <= PARCEL_REACHED[stage] ? "done" : ""}
+                aria-current={i === PARCEL_REACHED[stage] ? "step" : undefined}
+              >
+                <span className="dot" />
+                {label}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <ol className="order-steps">
+            {FLOW.map((s, i) => (
+              <li key={s} className={i <= reached ? "done" : ""} aria-current={i === reached ? "step" : undefined}>
+                <span className="dot" />
+                {STATUS[s].customer}
+              </li>
+            ))}
+          </ol>
+        ))}
+
+      {live.loading && <p className="track-live-note">Checking with PostEx…</p>}
+      {steps.length > 0 && <Journey steps={steps} />}
 
       {o.tracking_number && (
         <div className="track-courier">
@@ -190,5 +232,76 @@ function TrackedOrder({ order: o }) {
         ))}
       </ul>
     </article>
+  );
+}
+
+// PostEx's steps for this order's parcel, when it has one.
+function useParcel(o, phone) {
+  const wanted = o.courier === "PostEx" && o.tracking_number && LIVE.has(o.status);
+  const [state, setState] = useState({ loading: Boolean(wanted), events: null });
+  useEffect(() => {
+    if (!wanted) return;
+    let alive = true;
+    parcelJourney(phone, o.tracking_number).then(
+      (events) => alive && setState({ loading: false, events }),
+      () => alive && setState({ loading: false, events: null }) // the order's own status still shows
+    );
+    return () => {
+      alive = false;
+    };
+  }, [wanted, phone, o.tracking_number]);
+  return state;
+}
+
+// The heading and the line under it, from where the parcel really is.
+function parcelHeadline(stage, steps, o) {
+  const cash = o.payment_status === "paid" ? "" : ` and ${formatPrice(o.total)} ready`;
+  switch (stage) {
+    case "delivered":
+      return [`Delivered on ${day(steps[0].at)}`, "We hope you love it."];
+    case "out":
+      return ["Out for delivery", `The PostEx rider is bringing it today — keep your phone on${cash}.`];
+    case "attempted":
+      return [
+        "Delivery attempted",
+        /couldn't reach/.test(steps[0].text)
+          ? "The rider couldn't reach you. PostEx will try again — keep your phone on, or WhatsApp us."
+          : "PostEx will try again. If something's wrong, WhatsApp us with your order number.",
+      ];
+    case "moving":
+      return [
+        steps[0].code === "0038" ? "At your local PostEx centre" : steps[0].text,
+        "It's on the way. The PostEx rider will call you before delivering.",
+      ];
+    case "returning":
+      return ["Being returned to Fanaar", "It's coming back to us. If you'd still like it, WhatsApp us."];
+    case "returned":
+      return ["Returned to Fanaar", "It came back to us. If you'd still like it, WhatsApp us."];
+    default:
+      return ["Packed and booked with PostEx", "PostEx will collect it from us soon."];
+  }
+}
+
+// Where the parcel has been, newest first — the latest few, the rest on tap.
+function Journey({ steps }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? steps : steps.slice(0, 4);
+  return (
+    <div className="track-journey">
+      <span className="eyebrow">Where it is</span>
+      <ol>
+        {shown.map((s, i) => (
+          <li key={s.text} className={i === 0 ? "is-latest" : ""}>
+            <span className="track-journey-text">{s.text}</span>
+            <time dateTime={s.at}>{when(s.at)}</time>
+          </li>
+        ))}
+      </ol>
+      {steps.length > 4 && (
+        <button type="button" className="link-underline track-journey-more" onClick={() => setAll(!all)}>
+          {all ? "Show less" : `Show the full journey (${steps.length} steps)`}
+        </button>
+      )}
+    </div>
   );
 }

@@ -1,33 +1,55 @@
-import { useMemo, useState, useEffect } from "react";
-import { useParams, Link, NavLink } from "react-router-dom";
-import { categoryTiles } from "../data/store";
+import { useEffect, useMemo, useState } from "react";
+import { Link, NavLink, useParams } from "react-router-dom";
+import { categoryTiles, collectionSpread, collections as collectionInfo } from "../data/store";
 import { totalStock } from "../lib/catalog";
 import { useCatalog } from "../context/CatalogContext";
-import ProductCard from "../components/ProductCard";
-import { GridSkeleton } from "../components/Skeleton";
+import ListingCard from "../components/ListingCard";
+import { LookSpread, MoreFromFanaar, Story } from "../components/Editorial";
+
+// A collection, laid out like an editorial catalogue: title and a line about
+// it, quiet category links, an even grid of photos — opened up after the
+// first rows by a two-image lookbook spread ("Shop the look") — and a story
+// and more from Fanaar at the end.
 
 const SORTS = [
   { key: "featured", label: "Featured" },
-  { key: "price-asc", label: "Price: low to high" },
-  { key: "price-desc", label: "Price: high to low" },
-  { key: "title", label: "Alphabetical" },
+  { key: "price-asc", label: "Price, low to high" },
+  { key: "price-desc", label: "Price, high to low" },
+  { key: "title", label: "A to Z" },
 ];
+const VIEW_KEY = "fanaar-collection-view"; // "grid" (4 / 2 per row) or "large" (2 / 1)
+const SPREAD_AFTER = 8;
+
+function savedView() {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "large" ? "large" : "grid";
+  } catch {
+    return "grid";
+  }
+}
 
 export default function Collection() {
   const { handle } = useParams();
-  const { getCollection, ready } = useCatalog();
-  const { meta, items } = getCollection(handle);
+  const catalog = useCatalog();
+  const { meta, items } = catalog.getCollection(handle);
   const [sort, setSort] = useState("featured");
+  const [view, setView] = useState(savedView);
+  const title = meta ? meta.title : "Collection";
+  const description = collectionInfo.find((c) => c.handle === handle)?.description;
 
+  useEffect(() => setSort("featured"), [handle]);
   useEffect(() => {
-    setSort("featured");
-  }, [handle]);
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      /* fine — the choice lasts for this visit */
+    }
+  }, [view]);
 
   const sorted = useMemo(() => {
     const list = [...items];
-    // Always float in-stock pieces above sold-out ones.
-    const byStock = (a, b) =>
-      (totalStock(b) > 0 ? 1 : 0) - (totalStock(a) > 0 ? 1 : 0);
+    // In-stock pieces always come before sold-out ones.
+    const byStock = (a, b) => (totalStock(b) > 0 ? 1 : 0) - (totalStock(a) > 0 ? 1 : 0);
     switch (sort) {
       case "price-asc":
         return list.sort((a, b) => byStock(a, b) || a.price - b.price);
@@ -40,69 +62,43 @@ export default function Collection() {
     }
   }, [items, sort]);
 
+  const card = (p) => <ListingCard key={p.id} product={p} colorways={catalog.getColorways(p)} />;
+  const first = sorted.slice(0, SPREAD_AFTER);
+  const rest = sorted.slice(SPREAD_AFTER);
+
   return (
-    <div className="wrap">
-      <nav className="crumbs" aria-label="Breadcrumb">
-        <Link to="/">Home</Link>
-        <span aria-hidden="true">/</span>
-        <span className="current">{meta ? meta.title : "Collection"}</span>
-      </nav>
+    <div className="cl">
+      <div className="wrap cl-wrap">
+        <nav className="crumbs" aria-label="Breadcrumb">
+          <Link to="/">Home</Link>
+          <span aria-hidden="true">/</span>
+          <span className="current">{title}</span>
+        </nav>
 
-      <div className="collection-head">
-        <span className="eyebrow">Fanaar</span>
-        <h1>{meta ? meta.title : "Collection"}</h1>
-        <div className="count">
-          {ready ? `${items.length} ${items.length === 1 ? "piece" : "pieces"}` : "\u00a0"}
-        </div>
-      </div>
+        <header className="cl-head">
+          <h1>{title}</h1>
+          {description && <p>{description}</p>}
+        </header>
 
-      <div className="chip-row" role="navigation" aria-label="Categories">
-        <NavLink
-          to="/collections/all-top"
-          className={({ isActive }) => `chip ${isActive ? "active" : ""}`}
-        >
-          All
-        </NavLink>
-        {categoryTiles.map((c) => (
-          <NavLink
-            key={c.handle}
-            to={`/collections/${c.handle}`}
-            className={({ isActive }) => `chip ${isActive ? "active" : ""}`}
-          >
-            {c.title}
+        <nav className="cl-cats" aria-label="Categories">
+          <NavLink to="/collections/all-top" className={({ isActive }) => (isActive ? "is-active" : "")}>
+            All
           </NavLink>
-        ))}
-      </div>
+          {categoryTiles.map((c) => (
+            <NavLink key={c.handle} to={`/collections/${c.handle}`} className={({ isActive }) => (isActive ? "is-active" : "")}>
+              {c.title}
+            </NavLink>
+          ))}
+        </nav>
 
-      {!ready ? (
-        <div style={{ paddingBottom: 110 }}>
-          <GridSkeleton count={6} />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-lead">Nothing here yet.</p>
-          <p className="empty-sub">
-            This collection is being restocked. Browse everything else in the
-            meantime.
-          </p>
-          <Link to="/collections/all-top" className="btn-solid">
-            Shop all
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="toolbar">
-            <span className="toolbar-count">
-              Showing {sorted.length}{" "}
-              {sorted.length === 1 ? "piece" : "pieces"}
-            </span>
-            <label className="sort">
+        <div className="cl-bar">
+          <span className="cl-count">
+            {catalog.ready ? `${sorted.length} ${sorted.length === 1 ? "piece" : "pieces"}` : " "}
+          </span>
+          <div className="cl-bar-tools">
+            <label className="cl-sort">
               <span>Sort</span>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                aria-label="Sort products"
-              >
+              <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
                 {SORTS.map((s) => (
                   <option key={s.key} value={s.key}>
                     {s.label}
@@ -110,15 +106,49 @@ export default function Collection() {
                 ))}
               </select>
             </label>
+            <span className="cl-view" role="group" aria-label="Pieces per row">
+              <span>View</span>
+              <button type="button" aria-pressed={view === "large"} onClick={() => setView("large")}>
+                <span className="cl-on-wide">2</span>
+                <span className="cl-on-narrow">1</span>
+              </button>
+              <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")}>
+                <span className="cl-on-wide">4</span>
+                <span className="cl-on-narrow">2</span>
+              </button>
+            </span>
           </div>
+        </div>
 
-          <div className="grid" style={{ paddingBottom: 110 }}>
-            {sorted.map((p, i) => (
-              <ProductCard key={p.id} product={p} index={i} />
+        {!catalog.ready ? (
+          <div className={`cl-grid is-${view}`} aria-busy="true" aria-label="Loading products">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div className="cl-skel" key={i}>
+                <div className="cl-skel-media" />
+                <div className="card-skel-line" />
+                <div className="card-skel-line short" />
+              </div>
             ))}
           </div>
-        </>
-      )}
+        ) : items.length === 0 ? (
+          <div className="empty-state">
+            <p className="empty-lead">Nothing here yet.</p>
+            <p className="empty-sub">This collection is being restocked. Browse everything else in the meantime.</p>
+            <Link to="/collections/all-top" className="btn-solid">
+              Shop all
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className={`cl-grid is-${view}`}>{first.map(card)}</div>
+            <LookSpread looks={[collectionSpread.small, collectionSpread.large]} products={catalog.products} />
+            {rest.length > 0 && <div className={`cl-grid is-${view}`}>{rest.map(card)}</div>}
+          </>
+        )}
+
+        <Story />
+        <MoreFromFanaar />
+      </div>
     </div>
   );
 }

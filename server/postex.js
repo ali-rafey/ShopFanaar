@@ -141,6 +141,15 @@ export function progress(row) {
   };
 }
 
+// PostEx times are Pakistan time; add the zone when PostEx leaves it off.
+// → ISO time, or null.
+export function pakistanTime(value) {
+  if (!value) return null;
+  const s = String(value);
+  const t = Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}+05:00`);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
 // The phone format PostEx wants: 03xxxxxxxxx. null when it isn't a mobile.
 export function postexPhone(phone) {
   const digits = String(phone || "").replace(/[^0-9]/g, "").replace(/^(0092|92|0)/, "");

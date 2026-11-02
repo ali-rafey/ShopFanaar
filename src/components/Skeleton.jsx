@@ -16,14 +16,18 @@ export function GridSkeleton({ count = 6 }) {
 
 export function ProductSkeleton() {
   return (
-    <div className="wrap pdp" aria-busy="true" aria-label="Loading product">
-      <div className="pdp-media">
-        <div className="card-skel-media" style={{ aspectRatio: "2 / 3" }} />
+    <div className="pd" aria-busy="true" aria-label="Loading product">
+      <div className="pd-media">
+        <div className="card-skel-media pd-skel-media" />
       </div>
-      <div className="pdp-info">
-        <div className="card-skel-line short" />
-        <div className="card-skel-line" style={{ height: 36, margin: "18px 0" }} />
-        <div className="card-skel-line short" />
+      <div className="pd-panel">
+        <div className="pd-panel-inner">
+          <div className="pd-top">
+            <div className="card-skel-line short" />
+            <div className="card-skel-line" style={{ height: 30, margin: "18px 0 12px" }} />
+            <div className="card-skel-line short" />
+          </div>
+        </div>
       </div>
     </div>
   );
