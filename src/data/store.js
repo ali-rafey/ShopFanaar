@@ -91,14 +91,13 @@ export const craft = {
 // `products`: handles of the pieces worn, for "Shop the look" on collection pages.
 export const lookbook = [
   { src: "/images/lookbook/look-01.webp", width: 720, height: 1280, alt: "Black quarter-zip with pleated black trousers", products: ["black-quarter-zipper"] },
-  { src: "/images/lookbook/look-02.webp", width: 720, height: 1080, alt: "Black quarter-zip and trousers, seated on a studio stool", products: ["black-quarter-zipper"] },
   { src: "/images/lookbook/look-03.webp", width: 720, height: 1280, alt: "Navy and white stripe tee with pleated black trousers", products: ["yarn-dyed-stripe-tee"] },
   { src: "/images/lookbook/look-04.webp", width: 720, height: 1073, alt: "Navy stripe tee with wide black trousers, full look", products: ["yarn-dyed-stripe-tee"] },
 ];
 
 // The two looks that open up a collection page after its first rows: a small
 // one on the left, a large one on the right (indexes into `lookbook`).
-export const collectionSpread = { small: 1, large: 2 };
+export const collectionSpread = { small: 0, large: 1 };
 
 // "More from Fanaar" — the cards at the end of every collection page.
 export const moreFromFanaar = [
