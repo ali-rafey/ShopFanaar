@@ -122,6 +122,8 @@ export const collections = [
   { handle: "frontpage", title: "Drop Needle", group: "autonomy", description: "Texture engineered at the yarn — drop needle ribs and micro-block knits." },
   { handle: "bottoms", title: "Bottoms", group: "bottoms", description: "Trousers cut to pair with every top." },
   { handle: "landing-page-collection", title: "New In", group: "featured", description: "The latest pieces from the studio." },
+  // Filled from the admin (Products → Clearance); in the menu only while it has pieces.
+  { handle: "clearance", title: "Clearance", group: "clearance", description: "Last pieces at lower prices, while sizes last." },
 ];
 
 // The size chart every piece has shown so far. Each product now has its own

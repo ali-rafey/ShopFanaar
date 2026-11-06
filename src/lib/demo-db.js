@@ -66,7 +66,16 @@ function seed() {
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(DB_KEY));
-    if (d && d.products) return d;
+    if (d && d.products) {
+      // Collections added since this browser's demo was seeded (as the
+      // migrations add them to the real database).
+      for (const c of C) {
+        if (!d.collections.some((x) => x.handle === c.handle)) {
+          d.collections.push({ handle: c.handle, title: c.title, nav_group: c.group, position: d.collections.length });
+        }
+      }
+      return d;
+    }
   } catch {
     /* fall through to a fresh seed */
   }
@@ -877,6 +886,15 @@ export function inventoryValue() {
 }
 
 // row: product columns; variants: [{id?, size, stock?, sku, position}]
+// A few product fields at once (clearance: collections, price, compare-at).
+export function updateProduct(id, row) {
+  return tx((d) => {
+    const p = d.products.find((x) => x.id === id);
+    if (!p) fail("That product no longer exists.");
+    Object.assign(p, row, { updated_at: now() });
+  });
+}
+
 export function saveProduct(id, row, variants) {
   return tx((d) => {
     if (d.products.some((p) => p.handle === row.handle && p.id !== id)) {

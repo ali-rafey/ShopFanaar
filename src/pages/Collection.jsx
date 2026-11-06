@@ -132,8 +132,17 @@ export default function Collection() {
           </div>
         ) : items.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-lead">Nothing here yet.</p>
-            <p className="empty-sub">This collection is being restocked. Browse everything else in the meantime.</p>
+            {handle === "clearance" ? (
+              <>
+                <p className="empty-lead">Nothing on clearance right now.</p>
+                <p className="empty-sub">Every piece is at its full price. Browse the collection instead.</p>
+              </>
+            ) : (
+              <>
+                <p className="empty-lead">Nothing here yet.</p>
+                <p className="empty-sub">This collection is being restocked. Browse everything else in the meantime.</p>
+              </>
+            )}
             <Link to="/collections/all-top" className="btn-solid">
               Shop all
             </Link>

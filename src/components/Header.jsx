@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { shop, categoryTiles, craft } from "../data/store";
 import { useCart } from "../context/CartContext";
 import { useSaved } from "../context/SavedContext";
+import { useCatalog } from "../context/CatalogContext";
 import SocialIcons from "./SocialIcons";
 
 const SHOP_LINKS = [
@@ -59,6 +60,8 @@ function IconBag() {
 export default function Header() {
   const { count, setOpen } = useCart();
   const { count: savedCount } = useSaved();
+  // Clearance is in the menu only while the admin has pieces on it.
+  const hasClearance = useCatalog().getCollection("clearance").items.length > 0;
   const { pathname } = useLocation();
 
   const [scrolled, setScrolled] = useState(false);
@@ -166,6 +169,15 @@ export default function Header() {
               >
                 About
               </Link>
+              {hasClearance && (
+                <Link
+                  to="/collections/clearance"
+                  className="navitem"
+                  onMouseEnter={() => openMega(null)}
+                >
+                  Clearance
+                </Link>
+              )}
             </nav>
 
             <button
@@ -283,6 +295,11 @@ export default function Header() {
       <div className={`overlay-menu ${mobileOpen ? "open" : ""}`}>
         <div className="overlay-inner">
           <nav className="overlay-nav">
+            {hasClearance && (
+              <Link to="/collections/clearance" style={{ transitionDelay: "0.03s" }}>
+                Clearance
+              </Link>
+            )}
             <span className="overlay-label">Shop</span>
             {SHOP_LINKS.map((l, i) => (
               <Link

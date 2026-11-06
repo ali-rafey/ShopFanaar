@@ -11,6 +11,7 @@ import OrderDetail from "./pages/OrderDetail";
 import NewOrder from "./pages/NewOrder";
 import Products from "./pages/Products";
 import ProductEdit from "./pages/ProductEdit";
+import Clearance from "./pages/Clearance";
 import Settings from "./pages/Settings";
 import Inbox from "./pages/Inbox";
 import Detection from "./pages/Detection";
@@ -325,6 +326,7 @@ export default function AdminApp() {
             <Route path="orders/:id" element={<OrderDetail />} />
             <Route path="products" element={<Products />} />
             <Route path="products/new" element={<ProductEdit />} />
+            <Route path="products/clearance" element={<Clearance />} />
             <Route path="products/:id" element={<ProductEdit />} />
             <Route path="detection" element={<Detection />} />
             <Route path="inbox" element={<Inbox />} />

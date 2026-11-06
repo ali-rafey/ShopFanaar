@@ -3289,3 +3289,121 @@ textarea.adm-input {
     grid-row: 2;
   }
 }
+
+/* ------------------------------------------------------------ clearance */
+/* Products → Clearance (pages/Clearance.jsx). */
+.adm-btn-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--a-ink);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.adm-clr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-clr-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+}
+.adm-clr-row + .adm-clr-row {
+  border-top: 1px solid var(--a-line);
+}
+.adm-clr-main {
+  flex: 1;
+  min-width: 0;
+}
+.adm-clr-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.adm-clr-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+.adm-clr-remove {
+  flex: none;
+  color: var(--a-danger);
+}
+.adm-clr-sub {
+  display: block;
+  margin: 2px 0 10px;
+  color: var(--a-ink-2);
+  font-size: 12.5px;
+}
+.adm-clr-sub s {
+  color: var(--a-muted);
+}
+.adm-clr-price {
+  display: flex;
+  gap: 8px;
+}
+.adm-clr-price .adm-input {
+  flex: 1;
+  width: auto;
+  max-width: 220px;
+}
+.adm-clr-add h2 {
+  margin-bottom: 12px;
+}
+.adm-clr-pick {
+  list-style: none;
+  margin: 12px 0 16px;
+  padding: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+}
+.adm-clr-pick li + li {
+  border-top: 1px solid var(--a-line);
+}
+.adm-clr-pick .adm-check {
+  gap: 12px;
+  padding: 8px 12px;
+}
+.adm-clr-pick > .adm-hint {
+  padding: 12px;
+}
+.adm-clr-option small {
+  display: block;
+  color: var(--a-ink-2);
+  font-size: 12px;
+}
+.adm-clr-cut {
+  max-width: 320px;
+}
+.adm-clr-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 860px) {
+  .adm-clr-entry.adm-only-mobile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    background: var(--a-surface);
+    font-size: 16px;
+  }
+  .adm-clr-entry span:first-child {
+    flex: 1;
+    font-weight: 500;
+  }
+  .adm-clr-entry small {
+    color: var(--a-muted);
+    font-size: 14px;
+  }
+}

@@ -27,6 +27,7 @@ export default function Products() {
     );
   }, [all, status, q]);
   const count = (s) => all.filter((p) => !s || p.status === s).length;
+  const clearance = all.filter((p) => p.collections.includes(api.CLEARANCE)).length;
 
   return (
     <>
@@ -34,9 +35,14 @@ export default function Products() {
         title="Products"
         sub="Edit prices, stock, photos and what shows on the store."
         actions={
-          <Link to="/admin/products/new" className="adm-btn primary">
-            Add product
-          </Link>
+          <>
+            <Link to="/admin/products/clearance" className="adm-btn adm-only-desktop">
+              Clearance{clearance > 0 && <span className="adm-btn-count">{clearance}</span>}
+            </Link>
+            <Link to="/admin/products/new" className="adm-btn primary">
+              Add product
+            </Link>
+          </>
         }
       />
 
@@ -53,6 +59,12 @@ export default function Products() {
           </button>
         ))}
       </div>
+      {/* Phones: no room beside the large title, so Clearance is a row of its own. */}
+      <Link to="/admin/products/clearance" className="adm-clr-entry adm-only-mobile">
+        <span>Clearance</span>
+        <small>{clearance ? `${clearance} ${clearance === 1 ? "piece" : "pieces"}` : "Nothing on clearance"}</small>
+        <span className="adm-chevron" aria-hidden="true" />
+      </Link>
       <div className="adm-toolbar">
         <input
           type="search"

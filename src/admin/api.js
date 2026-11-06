@@ -373,6 +373,36 @@ export async function saveProduct(product, original) {
   return id;
 }
 
+// Clearance = the "clearance" collection plus a lower price, with the full
+// price kept as the compare-at price so the store shows it struck through.
+//   on:      add to clearance; `price` (optional) is the clearance price
+//   off:     take it out; `restore` puts the full price back
+export const CLEARANCE = "clearance";
+
+export const fullPrice = (p) => (p.compareAtPrice > p.price ? p.compareAtPrice : p.price);
+
+export async function setClearance(product, { on, price, restore = false }) {
+  const row = {};
+  const tagged = product.collections.includes(CLEARANCE);
+  if (on) {
+    if (!tagged) row.collections = [...product.collections, CLEARANCE];
+    if (price != null) {
+      const full = fullPrice(product);
+      row.price = Math.min(price, full);
+      row.compare_at_price = price < full ? full : null;
+    }
+  } else {
+    if (tagged) row.collections = product.collections.filter((h) => h !== CLEARANCE);
+    if (restore && product.compareAtPrice > product.price) {
+      row.price = product.compareAtPrice;
+      row.compare_at_price = null;
+    }
+  }
+  if (!Object.keys(row).length) return;
+  if (!sb) return (await demo()).updateProduct(product.id, row);
+  unwrap(await sb.from("products").update(row).eq("id", product.id));
+}
+
 export async function deleteProduct(product) {
   if (!sb) return (await demo()).deleteProduct(product.id);
   unwrap(await sb.from("products").delete().eq("id", product.id));

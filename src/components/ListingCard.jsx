@@ -21,6 +21,7 @@ export default function ListingCard({ product, colorways = [] }) {
   const colour = multi ? colorways.find((c) => c.id === product.id)?.colorName : null;
   const name = multi ? product.title.split(" - ")[0].trim() : product.title;
   const href = `/products/${product.handle}`;
+  const off = product.compareAtPrice > product.price ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
 
   return (
     <article ref={ref} className={`lc ${inView ? "in" : ""} ${stock === 0 ? "is-sold" : ""}`}>
@@ -29,7 +30,7 @@ export default function ListingCard({ product, colorways = [] }) {
           <img src={thumb(product.images[0])} alt="" loading="lazy" />
           {CAN_HOVER && product.images[1] && <img className="alt" src={thumb(product.images[1])} alt="" loading="lazy" />}
         </Link>
-        {stock === 0 && <span className="lc-flag">Sold out</span>}
+        {stock === 0 ? <span className="lc-flag">Sold out</span> : off > 0 && <span className="lc-flag">−{off}%</span>}
         <button
           type="button"
           className={`lc-save ${saved ? "is-saved" : ""}`}
