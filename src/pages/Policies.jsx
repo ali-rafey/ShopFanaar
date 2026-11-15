@@ -104,7 +104,7 @@ export function Privacy() {
       eyebrow="Policies"
       title="Privacy policy"
       lead="What we collect when you use shopfanaar.com, why, and who it's shared with."
-      updated="10 October 2026"
+      updated="15 November 2026"
     >
       <InfoSection title="What we collect">
         <ul>
@@ -120,13 +120,14 @@ export function Privacy() {
             message.
           </li>
           <li>
-            <strong>While you browse:</strong> so we can see how many people are on the store,
-            your browser keeps a random ID and tells us which page you&apos;re on, how you arrived
-            (for example from Instagram), your device type, how many items are in your cart and
-            your approximate city, which our hosting provider estimates from your connection
-            (we don&apos;t store your IP address). It isn&apos;t linked to your name or contact
-            details and isn&apos;t shared with anyone. When you order, how you found us (for example
-            which of our ads you clicked) is saved with the order.
+            <strong>While you browse:</strong> so we can see how people use the store, your
+            browser keeps a random ID and tells us which pages you open, how you arrived (for
+            example from Instagram), your device type, what you add to your cart, whether you open
+            the checkout or place an order, and your approximate city, which our hosting provider
+            estimates from your connection (we don&apos;t store your IP address). We keep this for
+            90 days. It isn&apos;t linked to your name, contact details or order and isn&apos;t
+            shared with anyone. When you order, how you found us (for example which of our ads you
+            clicked) is saved with the order.
           </li>
           <li>
             <strong>To stop fake orders:</strong> each order also keeps a scrambled (one-way) code of

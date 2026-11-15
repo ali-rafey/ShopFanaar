@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { compactMoney, money, PageHead, StatusBadge, timeAgo, useLoad, ErrorBox, Spinner } from "../ui";
 import { currentSubscription, pushEnvironment } from "../push";
 import LiveGlobe from "../LiveGlobe";
+import Funnel from "../Funnel";
+import { countryName, flag, pageName, placeName } from "../names";
 
 export default function Dashboard() {
   const { stats, version } = useFeed();
@@ -89,6 +91,7 @@ export default function Dashboard() {
       </section>
 
       <LiveView />
+      <ShoppersCard />
 
       <div className="adm-cols">
         <section className="adm-card">
@@ -152,6 +155,63 @@ export default function Dashboard() {
   );
 }
 
+// --------------------------------------------------------------- shoppers
+// What visitors did over the last 30 days (lib/visitors.js → shopper_funnel):
+// the funnel plus the pieces most often added to a cart. Reloads when an
+// order comes in; the journeys behind each step are on /admin/shoppers.
+
+function ShoppersCard() {
+  const { version } = useFeed();
+  const { data, error } = useLoad(() => api.getShopperFunnel(), [version]);
+  return (
+    <section className="adm-card adm-shoppers" aria-label="Shoppers">
+      <div className="adm-card-head">
+        <h2>Shoppers, last 30 days</h2>
+        <Link to="/admin/shoppers" className="adm-link">
+          See their journeys
+        </Link>
+      </div>
+      {!data ? (
+        error ? (
+          <ErrorBox error={error} />
+        ) : (
+          <p className="adm-empty">Loading…</p>
+        )
+      ) : (
+        <div className="adm-shoppers-grid">
+          <div>
+            <Funnel data={data} />
+          </div>
+          <TopAdded rows={data.top_added || []} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TopAdded({ rows }) {
+  const most = rows[0]?.added || 1;
+  return (
+    <div>
+      <h3 className="adm-live-sub">Most added to cart</h3>
+      {rows.length === 0 ? (
+        <p className="adm-hint">Nothing has been added to a cart yet.</p>
+      ) : (
+        <ul className="adm-bars">
+          {rows.map((r) => (
+            <li key={r.product_id} className="adm-bar" style={{ "--w": `${Math.round((r.added / most) * 100)}%` }}>
+              <span>{r.title}</span>
+              <b>
+                {r.added} added · {r.bought} bought
+              </b>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------- live view
 // Fanaar's own visitor count (lib/visitors.js → live_visitors), separate from
 // the Meta Pixel / Conversions API. Refreshes every 10 s while on screen.
@@ -182,38 +242,6 @@ function useLiveVisitors() {
     };
   }, []);
   return state;
-}
-
-const PAGE_NAMES = {
-  "/": "Home",
-  "/checkout": "Checkout",
-  "/order": "Order confirmation",
-  "/about": "About",
-  "/saved": "Saved pieces",
-  "/pages/contact": "Contact",
-};
-const tidy = (handle) => handle.charAt(0).toUpperCase() + handle.slice(1).replace(/-/g, " ");
-
-const regionNames =
-  typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames(["en"], { type: "region" }) : null;
-function countryName(code) {
-  try {
-    return regionNames?.of(code) || code;
-  } catch {
-    return code;
-  }
-}
-const flag = (code) => String.fromCodePoint(...[...code].map((c) => 0x1f1a5 + c.charCodeAt(0)));
-const placeName = (p) => p.city || countryName(p.country);
-
-function pageName({ path, title }) {
-  if (title) return title;
-  if (PAGE_NAMES[path]) return PAGE_NAMES[path];
-  const [, kind, handle] = path.split("/");
-  if (kind === "products" && handle) return tidy(handle);
-  if (kind === "collections" && handle) return `Collection · ${tidy(handle)}`;
-  if (kind === "policies") return "Policies";
-  return path;
 }
 
 function LiveView() {

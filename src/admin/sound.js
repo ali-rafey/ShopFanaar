@@ -4,6 +4,16 @@
 const ORDER_SOUND_URL = "/sounds/new-order.mp3";
 const MUTE_KEY = "fanaar-admin-mute";
 
+// 50 ms of digital silence as a WAV. iPhone only lets a page play sound
+// after a tap, and the permission sticks to the <audio> element that played
+// during that tap — so the first tap plays this clip (which cannot make a
+// sound) on the shared element, and the element then switches to the order
+// sound for later alerts. Playing the order sound itself muted, as before,
+// still let a blip of it through on iPhone when the admin app opened.
+const SILENCE =
+  "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACA" +
+  "gICA".repeat(133); // 400 samples at the zero level (0x80)
+
 let audio = null;
 const getAudio = () => {
   if (!audio) {
@@ -13,22 +23,18 @@ const getAudio = () => {
   return audio;
 };
 
-// iPhone only lets a page play sound after a tap. Prime the shared audio
-// element on the first tap so later order alerts can play on their own.
 export function unlockAudioOnFirstTap() {
   const unlock = () => {
+    document.removeEventListener("pointerdown", unlock, true);
+    if (isMuted()) return; // nothing to unlock while the sound is off
     const a = getAudio();
-    a.muted = true;
+    a.src = SILENCE;
     a.play()
-      .then(() => {
-        a.pause();
-        a.currentTime = 0;
-      })
       .catch(() => {})
       .finally(() => {
-        a.muted = false;
+        a.src = ORDER_SOUND_URL;
+        a.load();
       });
-    document.removeEventListener("pointerdown", unlock, true);
   };
   document.addEventListener("pointerdown", unlock, true);
   return () => document.removeEventListener("pointerdown", unlock, true);
@@ -53,6 +59,7 @@ export const setMuted = (muted) => {
 export function playOrderSound() {
   if (isMuted()) return;
   const a = getAudio();
+  if (!a.src.endsWith(ORDER_SOUND_URL)) a.src = ORDER_SOUND_URL; // still on the silent clip
   a.currentTime = 0;
   a.play().catch(() => {});
 }

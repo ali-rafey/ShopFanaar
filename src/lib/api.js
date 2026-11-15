@@ -174,3 +174,17 @@ export function sendVisit(payload) {
     body: JSON.stringify(payload),
   }).catch(() => {});
 }
+
+// One step of a shopper's journey for the admin's Shoppers view
+// (lib/visitors.js → shop_journey). keepalive: the "order" step is sent
+// just before the shopper is taken to the order page.
+export function sendStep(payload) {
+  if (BACKEND === "demo") return loadDemo().then((d) => d.shopJourney(payload)).catch(() => {});
+  if (BACKEND !== "supabase") return Promise.resolve();
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/shop_journey`, {
+    method: "POST",
+    headers: restHeaders(),
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+}

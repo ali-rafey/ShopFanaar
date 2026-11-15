@@ -15,6 +15,7 @@ import Clearance from "./pages/Clearance";
 import Settings from "./pages/Settings";
 import Inbox from "./pages/Inbox";
 import Detection from "./pages/Detection";
+import Shoppers from "./pages/Shoppers";
 import Accounts from "./accounts/Accounts";
 import "./admin.css";
 
@@ -329,6 +330,7 @@ export default function AdminApp() {
             <Route path="products/clearance" element={<Clearance />} />
             <Route path="products/:id" element={<ProductEdit />} />
             <Route path="detection" element={<Detection />} />
+            <Route path="shoppers" element={<Shoppers />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="settings" element={<Settings />} />
             <Route path="accounts" element={<Accounts />} />

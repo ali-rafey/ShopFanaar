@@ -6,6 +6,7 @@ import { BACKEND, placeOrder, saveOrderSource } from "../lib/api";
 import { orderSource } from "../lib/attribution";
 import { formatPrice, shippingFor, thumb } from "../lib/catalog";
 import { trackInitiateCheckout, trackPurchase } from "../lib/pixel";
+import { recordStep } from "../lib/visitors";
 
 const DETAILS_KEY = "fanaar-checkout-details";
 const FIELDS = ["name", "phone", "email", "address", "city", "postal_code"];
@@ -70,6 +71,7 @@ export default function Checkout() {
     if (!tracked.current && items.length) {
       tracked.current = true;
       trackInitiateCheckout(items, subtotal);
+      recordStep("checkout", { items: items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })) });
     }
   }, [items, subtotal]);
 
@@ -110,6 +112,7 @@ export default function Checkout() {
       });
       trackPurchase(order, form);
       saveOrderSource(order.id, orderSource());
+      recordStep("order", { value: order.total, count: order.items.reduce((n, i) => n + i.quantity, 0) });
       try {
         if (remember) {
           localStorage.setItem(

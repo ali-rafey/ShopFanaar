@@ -8,7 +8,12 @@
 // for this browser, the page, how the visit arrived, the device type, the
 // number of items in the cart and the approximate city (asked once per visit
 // from api/shop-region.js). No names, IP addresses or contact details.
-import { BACKEND, sendVisit } from "./api";
+//
+// It also records the shopper's steps under the same id for the admin's
+// Shoppers view (recordStep → shop_journey): each page opened, a piece added
+// to the cart, the checkout opened with its items, an order placed — product
+// ids and amounts only, never the order itself.
+import { BACKEND, sendStep, sendVisit } from "./api";
 import { touchLabel, visitTouch } from "./attribution";
 
 const BEAT_MS = 30_000;
@@ -23,8 +28,7 @@ let enabled;
 export function trackVisit(pathname) {
   enabled ??= shouldCount();
   if (!enabled) return;
-  // Order pages carry the order id; only "on an order page" matters here.
-  path = (pathname.startsWith("/order/") ? "/order" : pathname.replace(/\/+$/, "") || "/").slice(0, 200);
+  path = pagePath(pathname);
   if (!started) {
     started = true;
     visitSource(); // read the landing URL now, before the shopper moves on
@@ -33,6 +37,31 @@ export function trackVisit(pathname) {
     document.addEventListener("visibilitychange", beat);
   }
   beat();
+  // The checkout and order pages are recorded by their own steps; a repeat
+  // of the same path (React re-running the effect) isn't a new page.
+  if (path !== lastViewPath && path !== "/checkout" && path !== "/order") recordStep("view");
+  lastViewPath = path;
+}
+
+let lastViewPath = null;
+
+// Order pages carry the order id; only "on an order page" matters here.
+const pagePath = (pathname) =>
+  (pathname.startsWith("/order/") ? "/order" : pathname.replace(/\/+$/, "") || "/").slice(0, 200);
+
+// kind: view | cart { product_id, size, qty } | checkout { items: [{ id, size, qty }] }
+//       | order { value, count }
+// A page's own first effects run before the route effect above has seen the
+// page, so the path is read from the browser when it isn't set yet.
+export function recordStep(kind, data) {
+  enabled ??= shouldCount();
+  if (!enabled) return;
+  sendStep({
+    p_id: visitorId(),
+    p_kind: kind,
+    p_path: path ?? pagePath(window.location.pathname),
+    p_data: data || {},
+  });
 }
 
 // Hidden tabs stay quiet, so a visitor drops off the live count about a

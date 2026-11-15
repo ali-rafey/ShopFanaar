@@ -532,6 +532,133 @@ export function liveVisitors() {
   });
 }
 
+// ------------------------------------------------------------ shopper journeys
+// Mirrors shop_journey / shopper_funnel / shopper_journeys in *_shopper_journeys.sql.
+
+const STEP_RANK = { view: 0, cart: 1, checkout: 2, order: 3 };
+
+export function shopJourney({ p_id, p_kind, p_path, p_data }) {
+  return tx((d) => {
+    if (!p_id || !(p_kind in STEP_RANK)) return;
+    const input = p_data && typeof p_data === "object" ? p_data : {};
+    const price = (id) => d.products.find((p) => p.id === id)?.price;
+    const qty = (v) => Math.min(Math.max(Number.parseInt(v, 10) || 1, 1), 99);
+    const size = (v) => (v == null || String(v).trim() === "" ? null : String(v).trim().slice(0, 20));
+    let data = {};
+    if (p_kind === "cart") {
+      const pr = price(input.product_id);
+      if (pr == null) return;
+      data = { product_id: input.product_id, size: size(input.size), qty: qty(input.qty), price: pr };
+    } else if (p_kind === "checkout") {
+      const items = (Array.isArray(input.items) ? input.items : []).slice(0, 20).flatMap((i) => {
+        const pr = price(i?.id);
+        return pr == null ? [] : [{ product_id: i.id, size: size(i.size), qty: qty(i.qty), price: pr }];
+      });
+      if (!items.length) return;
+      data = {
+        items,
+        value: items.reduce((n, i) => n + i.price * i.qty, 0),
+        count: items.reduce((n, i) => n + i.qty, 0),
+      };
+    } else if (p_kind === "order") {
+      data = { value: Math.max(0, Number(input.value) || 0), count: Math.max(0, Number(input.count) || 0) };
+    }
+    (d.visitor_events ||= []).push({ visitor_id: p_id, at: Date.now(), kind: p_kind, path: p_path || null, data });
+  });
+}
+
+export function shopperFunnel(days = 30) {
+  return tx((d) => {
+    const from = Date.now() - days * 864e5;
+    const all = d.visitor_events || [];
+    const ev = all.filter((e) => e.at > from);
+    const step = (f) => ({ browsers: new Set(ev.filter(f).map((e) => e.visitor_id)).size, events: ev.filter(f).length });
+    const sales = d.orders.filter((o) => new Date(o.created_at).getTime() > from && o.source?.kind !== "manual");
+    const kept = sales.filter((o) => o.status !== "cancelled" && o.status !== "returned");
+    const added = {};
+    ev.filter((e) => e.kind === "cart").forEach((e) => (added[e.data.product_id] = (added[e.data.product_id] || 0) + 1));
+    return {
+      days,
+      since: all.length ? new Date(Math.min(...all.map((e) => e.at))).toISOString() : null,
+      visitors: (d.visitors || []).filter((v) => v.last_seen > from).length,
+      home: step((e) => e.kind === "view" && e.path === "/"),
+      cart: step((e) => e.kind === "cart"),
+      checkout: step((e) => e.kind === "checkout"),
+      ordered: step((e) => e.kind === "order"),
+      purchases: {
+        orders: kept.length,
+        amount: kept.reduce((n, o) => n + o.total, 0),
+        cancelled: sales.length - kept.length,
+      },
+      top_added: Object.entries(added)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 6)
+        .map(([product_id, n]) => ({
+          product_id,
+          title: d.products.find((p) => p.id === product_id)?.title || "A removed piece",
+          added: n,
+          bought: d.items
+            .filter((i) => i.product_id === product_id && kept.some((o) => o.id === i.order_id))
+            .reduce((s, i) => s + i.quantity, 0),
+        })),
+    };
+  });
+}
+
+export function shopperJourneys(days = 30, stage = null, limit = 150) {
+  return tx((d) => {
+    const from = Date.now() - days * 864e5;
+    const minRank = stage === "order" ? 3 : stage === "checkout" ? 2 : 1;
+    const iso = (ms) => new Date(ms).toISOString();
+    const title = (id) => d.products.find((p) => p.id === id)?.title ?? null;
+    const byVisitor = new Map();
+    (d.visitor_events || [])
+      .filter((e) => e.at > from)
+      .sort((a, b) => a.at - b.at)
+      .forEach((e) => byVisitor.set(e.visitor_id, [...(byVisitor.get(e.visitor_id) || []), e]));
+    const out = [];
+    for (const [id, list] of byVisitor) {
+      const rank = Math.max(...list.map((e) => STEP_RANK[e.kind]));
+      if (rank < minRank) continue;
+      const v = (d.visitors || []).find((x) => x.id === id) || {};
+      const money = [...list].reverse().find((e) => e.kind === "checkout" || e.kind === "order");
+      out.push({
+        key: id.replace(/-/g, "").slice(0, 4).toUpperCase(),
+        stage: rank === 3 ? "order" : rank === 2 ? "checkout" : "cart",
+        first_at: iso(list[0].at),
+        last_at: iso(list[list.length - 1].at),
+        city: v.city ?? null,
+        country: v.country ?? null,
+        device: v.device ?? null,
+        source: v.source ?? null,
+        visits: v.visits ?? null,
+        value: money ? money.data.value : null,
+        events: list.slice(-60).map((e) => ({
+          at: iso(e.at),
+          kind: e.kind,
+          path: e.path,
+          title:
+            e.kind === "view"
+              ? d.products.find((p) => e.path === `/products/${p.handle}`)?.title ?? null
+              : e.kind === "cart"
+              ? title(e.data.product_id)
+              : null,
+          size: e.data.size ?? null,
+          qty: e.data.qty ?? null,
+          price: e.data.price ?? null,
+          value: e.data.value ?? null,
+          count: e.data.count ?? null,
+          items:
+            e.kind === "checkout"
+              ? e.data.items.map((i) => ({ title: title(i.product_id) || "A removed piece", size: i.size, qty: i.qty, price: i.price }))
+              : null,
+        })),
+      });
+    }
+    return out.sort((a, b) => b.last_at.localeCompare(a.last_at)).slice(0, limit);
+  });
+}
+
 export function stats() {
   return tx((d) => {
     const today = new Date();

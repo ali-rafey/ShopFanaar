@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { trackAddToCart } from "../lib/pixel";
+import { recordStep } from "../lib/visitors";
 import { useCatalog } from "./CatalogContext";
 
 const CartContext = createContext(null);
@@ -52,6 +53,7 @@ export function CartProvider({ children }) {
     setOpen(true);
     if (added <= 0) return; // already holding every unit in stock
     trackAddToCart(product, size, added);
+    recordStep("cart", { product_id: product.id, size, qty: added });
     setItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {

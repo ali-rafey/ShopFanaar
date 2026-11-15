@@ -3407,3 +3407,226 @@ textarea.adm-input {
     font-size: 14px;
   }
 }
+
+/* ------------------------------------------------------------ shoppers */
+/* Overview card: the funnel beside the pieces most added to a cart. */
+.adm-shoppers-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 28px;
+  align-items: start;
+}
+.adm-funnel-base {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+.adm-funnel-base strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--a-ink);
+}
+.adm-funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.adm-funnel a {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 40px;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 13.5px;
+  overflow: hidden;
+}
+.adm-funnel a::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w);
+  min-width: 3px;
+  background: #e9f3ed;
+}
+.adm-funnel a:hover::before {
+  background: #dcebe2;
+}
+.adm-funnel a > * {
+  position: relative;
+}
+.adm-funnel-label {
+  min-width: 0;
+}
+.adm-funnel-label small {
+  display: block;
+  font-size: 12px;
+  color: var(--a-muted);
+}
+.adm-funnel b {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.adm-funnel a > small {
+  color: var(--a-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* /admin/shoppers: one card per browser, its steps behind a tap. */
+.adm-journeys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* long one-line titles must not widen the list */
+  gap: 8px;
+}
+.adm-journey {
+  min-width: 0;
+  background: var(--a-surface);
+  border: 1px solid var(--a-line);
+  border-radius: var(--a-radius);
+}
+.adm-journey summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.adm-journey summary::-webkit-details-marker {
+  display: none;
+}
+.adm-journey-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-journey-title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adm-journey-sub {
+  color: var(--a-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adm-journey-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: none;
+}
+.adm-journey-side b {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.adm-stage {
+  display: inline-flex;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.adm-stage-order {
+  background: #e9f3ed;
+  color: #1d6b3a;
+}
+.adm-stage-checkout {
+  background: #fdf1dc;
+  color: #8a5a00;
+}
+.adm-stage-cart {
+  background: #efefec;
+  color: #4a4a4a;
+}
+.adm-trail {
+  list-style: none;
+  margin: 0 16px;
+  padding: 6px 0 4px;
+  border-top: 1px solid var(--a-line);
+}
+.adm-trail li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13.5px;
+}
+.adm-trail time {
+  color: var(--a-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+.adm-trail li.is-cart > span,
+.adm-trail li.is-checkout > span,
+.adm-trail li.is-order > span {
+  font-weight: 500;
+}
+.adm-trail li.is-order > span {
+  color: #1d6b3a;
+}
+.adm-trail small {
+  display: block;
+  font-weight: 400;
+  color: var(--a-muted);
+  font-size: 12.5px;
+}
+.adm-trail-foot {
+  margin: 0;
+  padding: 8px 16px 12px;
+  color: var(--a-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .adm-shoppers-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+@media (max-width: 860px) {
+  .adm-journey {
+    border-width: 0.5px;
+    border-radius: 14px;
+  }
+  .adm-journey summary {
+    padding: 12px 14px 12px 16px;
+  }
+  .adm-trail li {
+    grid-template-columns: 102px minmax(0, 1fr);
+  }
+  .adm-trail time {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .adm-funnel a {
+    grid-template-columns: minmax(0, 1fr) auto 36px;
+    padding: 10px 12px;
+  }
+}
+.adm-shoppers .adm-bar b {
+  flex: none;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--a-ink-2);
+}

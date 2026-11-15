@@ -78,6 +78,19 @@ export async function getLiveVisitors() {
   return unwrap(await sb.rpc("live_visitors"));
 }
 
+// What shoppers did over the last `days` days (lib/visitors.js → shop_journey):
+// the funnel for the Overview, and each browser's steps for /admin/shoppers.
+// `stage` keeps the browsers that got at least that far: cart | checkout | order.
+export async function getShopperFunnel(days = 30) {
+  if (!sb) return (await demo()).shopperFunnel(days);
+  return unwrap(await sb.rpc("shopper_funnel", { p_days: days }));
+}
+
+export async function getShopperJourneys({ days = 30, stage = null } = {}) {
+  if (!sb) return (await demo()).shopperJourneys(days, stage);
+  return unwrap(await sb.rpc("shopper_journeys", { p_days: days, p_stage: stage }));
+}
+
 // ----------------------------------------------------------------- orders
 
 const ORDER_LIST_COLS =
