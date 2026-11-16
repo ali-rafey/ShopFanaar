@@ -795,6 +795,37 @@ export function getOrder(id) {
   });
 }
 
+// Mirrors set_order_discount in *_order_discount.sql.
+export function setOrderDiscount(id, discount, percent = null) {
+  return tx((d) => {
+    const o = d.orders.find((x) => x.id === id);
+    if (!o) fail("Order not found.");
+    if (["delivered", "cancelled", "returned"].includes(o.status)) fail(`This order is ${o.status}, so its total can't change now.`);
+    if (o.tracking_number) {
+      fail(`This order is already booked with ${o.courier || "a courier"}. Cancel the booking first, then change the discount and book it again.`);
+    }
+    const full = o.subtotal + o.shipping_fee;
+    const next = Number(discount) || 0;
+    if (next < 0 || next > full) fail(`The discount must be between Rs.0 and the order total, Rs.${full.toLocaleString("en-PK")}.`);
+    if (percent != null && (percent <= 0 || percent > 100)) fail("The percentage must be more than 0 and at most 100.");
+    if (next === (o.discount || 0)) return { discount: o.discount || 0, total: o.total };
+    o.discount = next;
+    o.total = full - next;
+    o.updated_at = now();
+    const rs = (n) => `Rs.${n.toLocaleString("en-PK")}`;
+    addEvent(
+      d,
+      id,
+      "payment",
+      null,
+      next === 0
+        ? `Discount removed · total ${rs(o.total)}`
+        : `Discount ${rs(next)}${percent != null ? ` (${Number(percent.toFixed(2))}% off)` : ""} · total ${rs(o.total)}`
+    );
+    return { discount: o.discount, total: o.total };
+  });
+}
+
 export function setOrderStatus(id, status, note, restock = true) {
   return tx((d) => {
     const o = d.orders.find((x) => x.id === id);

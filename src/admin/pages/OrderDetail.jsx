@@ -110,7 +110,7 @@ export default function OrderDetail() {
             <dl className="adm-totals">
               <div><dt>Subtotal</dt><dd>{money(o.subtotal)}</dd></div>
               <div><dt>Shipping</dt><dd>{o.shipping_fee ? money(o.shipping_fee) : "Free"}</dd></div>
-              {o.discount > 0 && <div><dt>Discount</dt><dd>−{money(o.discount)}</dd></div>}
+              <Discount order={o} busy={busy} act={act} />
               <div className="grand">
                 <dt>{handedOver(o) ? "Total · paid in person" : "Total · cash on delivery"}</dt>
                 <dd>{money(o.total)}</dd>
@@ -152,6 +152,118 @@ export default function OrderDetail() {
 
       <PackingSlip order={o} items={items} />
     </>
+  );
+}
+
+// The discount line of the totals, and the editor behind it: an amount in
+// rupees or a percentage of the full total (shipping included), shown in
+// rupees before saving. Only until the order is booked — the booking carries
+// the amount to collect (set_order_discount refuses after that, too).
+function Discount({ order: o, busy, act }) {
+  const full = o.subtotal + o.shipping_fee;
+  const editable = !o.tracking_number && !["delivered", "cancelled", "returned"].includes(o.status);
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("pct"); // "pct" | "rs"
+  const [value, setValue] = useState("");
+
+  const n = Number(value);
+  const valid =
+    value !== "" &&
+    (mode === "pct" ? /^\d{1,3}(\.\d{1,2})?$/.test(value) && n > 0 && n <= 100 : /^\d+$/.test(value) && n > 0 && n <= full);
+  const rupees = valid ? (mode === "pct" ? Math.round((full * n) / 100) : n) : null;
+
+  const start = () => {
+    setMode("pct");
+    setValue("");
+    setOpen(true);
+  };
+  const save = async (amount, percent) => {
+    if (await act(() => api.setOrderDiscount(o.id, amount, percent), amount ? "Discount saved" : "Discount removed")) {
+      setOpen(false);
+    }
+  };
+
+  if (!open) {
+    if (o.discount > 0) {
+      return (
+        <div className="adm-discount-row">
+          <dt>
+            Discount
+            {editable && (
+              <button type="button" className="adm-link" onClick={start} disabled={busy}>
+                Change
+              </button>
+            )}
+          </dt>
+          <dd>−{money(o.discount)}</dd>
+        </div>
+      );
+    }
+    return editable ? (
+      <div className="adm-discount-add">
+        <dt>
+          <button type="button" className="adm-link" onClick={start} disabled={busy}>
+            Add discount
+          </button>
+        </dt>
+        <dd />
+      </div>
+    ) : null;
+  }
+
+  return (
+    <div className="adm-discount-edit">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valid) save(rupees, mode === "pct" ? n : null);
+        }}
+      >
+        <div className="adm-discount-fields">
+          <div className="adm-seg" role="group" aria-label="Discount in">
+            <button type="button" className={mode === "pct" ? "on" : ""} aria-pressed={mode === "pct"} onClick={() => setMode("pct")}>
+              %
+            </button>
+            <button type="button" className={mode === "rs" ? "on" : ""} aria-pressed={mode === "rs"} onClick={() => setMode("rs")}>
+              Rs
+            </button>
+          </div>
+          <input
+            className={`adm-input ${value && !valid ? "bad" : ""}`}
+            inputMode={mode === "pct" ? "decimal" : "numeric"}
+            aria-label={mode === "pct" ? "Discount in percent" : "Discount in rupees"}
+            placeholder={mode === "pct" ? "e.g. 10" : "e.g. 200"}
+            value={value}
+            onChange={(e) => setValue(e.target.value.trim())}
+            autoFocus
+          />
+        </div>
+        {value && !valid ? (
+          <span className="adm-field-error">
+            {mode === "pct" ? "Enter a percentage from 1 to 100." : `Enter a whole number up to ${money(full)}.`}
+          </span>
+        ) : (
+          <p className="adm-hint">
+            {rupees != null
+              ? `${mode === "pct" ? `${n}% of ${money(full)} = ` : ""}${money(rupees)} off · new total ${money(full - rupees)}`
+              : `Off the full total of ${money(full)}, shipping included.`}
+          </p>
+        )}
+        <div className="adm-btns">
+          <button type="submit" className="adm-btn primary" disabled={!valid || busy}>
+            Save discount
+          </button>
+          <button type="button" className="adm-btn" disabled={busy} onClick={() => setOpen(false)}>
+            Cancel
+          </button>
+          {o.discount > 0 && (
+            <button type="button" className="adm-link adm-discount-remove" disabled={busy} onClick={() => save(0, null)}>
+              Remove discount
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -355,7 +467,8 @@ function Customer({ order: o, busy, act }) {
   const [form, setForm] = useState({});
   const first = o.customer_name.split(" ")[0];
   const wa = `https://wa.me/92${o.phone.slice(1)}?text=${encodeURIComponent(
-    `Assalam o Alaikum ${first}! Thank you for your order #${o.order_number} from Fanaar (${money(o.total)}, cash on delivery). ` +
+    `Assalam o Alaikum ${first}! Thank you for your order #${o.order_number} from Fanaar (${money(o.total)}` +
+      `${o.discount > 0 ? ` after a ${money(o.discount)} discount` : ""}, cash on delivery). ` +
       `Please reply YES to confirm delivery to: ${o.address}, ${o.city}.`
   )}`;
 

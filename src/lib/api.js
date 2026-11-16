@@ -176,8 +176,9 @@ export function sendVisit(payload) {
 }
 
 // One step of a shopper's journey for the admin's Shoppers view
-// (lib/visitors.js → shop_journey). keepalive: the "order" step is sent
-// just before the shopper is taken to the order page.
+// (lib/visitors.js → shop_journey). No keepalive: the store moves between
+// pages without reloading, so a step is never cut off, and keepalive on a
+// cross-site request isn't supported the same way in every browser.
 export function sendStep(payload) {
   if (BACKEND === "demo") return loadDemo().then((d) => d.shopJourney(payload)).catch(() => {});
   if (BACKEND !== "supabase") return Promise.resolve();
@@ -185,6 +186,5 @@ export function sendStep(payload) {
     method: "POST",
     headers: restHeaders(),
     body: JSON.stringify(payload),
-    keepalive: true,
   }).catch(() => {});
 }

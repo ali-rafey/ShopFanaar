@@ -161,6 +161,14 @@ export async function updateOrder(id, patch) {
   return unwrap(await sb.from("orders").update(patch).eq("id", id).select().single());
 }
 
+// Take `discount` rupees off the order's total (0 removes it). `percent` is
+// only for the timeline ("10% off") — the rupees are worked out in the admin.
+// Works until the order is booked with a courier (*_order_discount.sql).
+export async function setOrderDiscount(id, discount, percent = null) {
+  if (!sb) return (await demo()).setOrderDiscount(id, discount, percent);
+  return unwrap(await sb.rpc("set_order_discount", { p_order_id: id, p_discount: discount, p_percent: percent }));
+}
+
 export async function addOrderNote(id, message) {
   if (!sb) return (await demo()).addOrderNote(id, message);
   unwrap(await sb.from("order_events").insert({ order_id: id, kind: "note", message }));

@@ -3630,3 +3630,77 @@ textarea.adm-input {
   font-weight: 500;
   color: var(--a-ink-2);
 }
+
+/* ------------------------------------------------------------ order discount */
+/* Lives inside .adm-totals, whose "div" rule would otherwise stretch every
+   row in the editor — each piece below resets that. */
+.adm-totals .adm-discount-row dt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.adm-totals .adm-discount-row dd {
+  color: #1d6b3a;
+}
+.adm-totals .adm-discount-add {
+  padding: 2px 0;
+}
+.adm-totals .adm-discount-edit {
+  display: block;
+  margin: 8px 0 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--a-bg);
+}
+.adm-totals .adm-discount-fields {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+}
+.adm-totals .adm-discount-fields .adm-input {
+  flex: 1;
+  max-width: 200px;
+}
+.adm-seg {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--a-surface);
+}
+.adm-totals .adm-seg {
+  display: inline-flex;
+  padding: 0;
+}
+.adm-seg button {
+  width: 42px;
+  height: 36px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--a-ink-2);
+  cursor: pointer;
+}
+.adm-seg button + button {
+  border-left: 1px solid var(--a-line-2);
+}
+.adm-seg button.on {
+  background: var(--a-ink);
+  color: #fff;
+}
+.adm-totals .adm-discount-edit .adm-hint {
+  margin: 8px 0 0;
+}
+.adm-totals .adm-discount-edit .adm-btns {
+  justify-content: flex-start;
+  padding: 0;
+  margin-top: 10px;
+}
+.adm-discount-remove {
+  margin-left: auto;
+  color: var(--a-danger);
+}

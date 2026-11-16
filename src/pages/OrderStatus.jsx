@@ -127,6 +127,12 @@ export default function OrderStatus() {
               <dt>Shipping</dt>
               <dd>{order.shipping_fee === 0 ? "Free" : formatPrice(order.shipping_fee)}</dd>
             </div>
+            {order.discount > 0 && (
+              <div>
+                <dt>Discount</dt>
+                <dd>−{formatPrice(order.discount)}</dd>
+              </div>
+            )}
             <div className="co-total">
               <dt>Total</dt>
               <dd>{formatPrice(order.total)}</dd>
