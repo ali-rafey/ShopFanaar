@@ -16,6 +16,7 @@ import Settings from "./pages/Settings";
 import Inbox from "./pages/Inbox";
 import Detection from "./pages/Detection";
 import Shoppers from "./pages/Shoppers";
+import Payments from "./pages/Payments";
 import Accounts from "./accounts/Accounts";
 import "./admin.css";
 
@@ -331,6 +332,7 @@ export default function AdminApp() {
             <Route path="products/:id" element={<ProductEdit />} />
             <Route path="detection" element={<Detection />} />
             <Route path="shoppers" element={<Shoppers />} />
+            <Route path="payments" element={<Payments />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="settings" element={<Settings />} />
             <Route path="accounts" element={<Accounts />} />

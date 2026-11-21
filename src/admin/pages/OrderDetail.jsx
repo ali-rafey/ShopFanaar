@@ -156,11 +156,12 @@ export default function OrderDetail() {
 }
 
 // The discount line of the totals, and the editor behind it: an amount in
-// rupees or a percentage of the full total (shipping included), shown in
-// rupees before saving. Only until the order is booked — the booking carries
-// the amount to collect (set_order_discount refuses after that, too).
+// rupees or a percentage of the items, shown in rupees before saving. The
+// delivery fee is never discounted. Only until the order is booked — the
+// booking carries the amount to collect (set_order_discount refuses after
+// that, too).
 function Discount({ order: o, busy, act }) {
-  const full = o.subtotal + o.shipping_fee;
+  const items = o.subtotal;
   const editable = !o.tracking_number && !["delivered", "cancelled", "returned"].includes(o.status);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("pct"); // "pct" | "rs"
@@ -169,8 +170,9 @@ function Discount({ order: o, busy, act }) {
   const n = Number(value);
   const valid =
     value !== "" &&
-    (mode === "pct" ? /^\d{1,3}(\.\d{1,2})?$/.test(value) && n > 0 && n <= 100 : /^\d+$/.test(value) && n > 0 && n <= full);
-  const rupees = valid ? (mode === "pct" ? Math.round((full * n) / 100) : n) : null;
+    (mode === "pct" ? /^\d{1,3}(\.\d{1,2})?$/.test(value) && n > 0 && n <= 100 : /^\d+$/.test(value) && n > 0 && n <= items);
+  const rupees = valid ? (mode === "pct" ? Math.round((items * n) / 100) : n) : null;
+  const newTotal = (r) => items + o.shipping_fee - r;
 
   const start = () => {
     setMode("pct");
@@ -240,13 +242,13 @@ function Discount({ order: o, busy, act }) {
         </div>
         {value && !valid ? (
           <span className="adm-field-error">
-            {mode === "pct" ? "Enter a percentage from 1 to 100." : `Enter a whole number up to ${money(full)}.`}
+            {mode === "pct" ? "Enter a percentage from 1 to 100." : `Enter a whole number up to ${money(items)}, the items total.`}
           </span>
         ) : (
           <p className="adm-hint">
             {rupees != null
-              ? `${mode === "pct" ? `${n}% of ${money(full)} = ` : ""}${money(rupees)} off · new total ${money(full - rupees)}`
-              : `Off the full total of ${money(full)}, shipping included.`}
+              ? `${mode === "pct" ? `${n}% of ${money(items)} = ` : ""}${money(rupees)} off · new total ${money(newTotal(rupees))}`
+              : `Off the items (${money(items)}). Delivery is charged in full.`}
           </p>
         )}
         <div className="adm-btns">

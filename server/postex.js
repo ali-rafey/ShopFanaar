@@ -97,6 +97,13 @@ export function airwayBills(trackingNumbers) {
   return call("/v1/get-invoice", { query: { trackingNumbers: trackingNumbers.join(",") }, pdf: true, timeout: 40000 });
 }
 
+// Which payment (CPR) a parcel went into, and whether PostEx has paid it:
+// → { settle, settlementDate?, cpr1?, cpr1Date?, orderRefNumber, trackingNumber }.
+// The API has no list of CPRs; this per-parcel answer is the only source.
+export function paymentStatus(trackingNumber) {
+  return call(`/v1/payment-status/${encodeURIComponent(trackingNumber)}`);
+}
+
 // One parcel with its tracking history:
 // dist.transactionStatusHistory = [{ transactionStatusMessage, transactionStatusMessageCode, updatedAt }].
 export function trackOrder(trackingNumber) {

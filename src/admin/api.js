@@ -161,9 +161,10 @@ export async function updateOrder(id, patch) {
   return unwrap(await sb.from("orders").update(patch).eq("id", id).select().single());
 }
 
-// Take `discount` rupees off the order's total (0 removes it). `percent` is
-// only for the timeline ("10% off") — the rupees are worked out in the admin.
-// Works until the order is booked with a courier (*_order_discount.sql).
+// Take `discount` rupees off the order's items (0 removes it; delivery is
+// never discounted). `percent` is only for the timeline ("10% off") — the
+// rupees are worked out in the admin. Works until the order is booked with a
+// courier (*_discount_items_only.sql).
 export async function setOrderDiscount(id, discount, percent = null) {
   if (!sb) return (await demo()).setOrderDiscount(id, discount, percent);
   return unwrap(await sb.rpc("set_order_discount", { p_order_id: id, p_discount: discount, p_percent: percent }));
@@ -272,6 +273,16 @@ export const postexBook = (orders, pickupCode) => postex("book", { orders, picku
 // → { checked, linked: [...], moved: [...], attention: [...], syncedAt }
 export const postexSync = () => postex("sync", {});
 export const postexCancel = (id) => postex("cancel", { id });
+// Ask PostEx about payments (CPRs) and save what's new → { listed, checked, failed, checkedAt }.
+export const postexPayments = () => postex("payments", {});
+
+// PostEx's payments (CPRs) as saved by postexPayments (*_courier_payments.sql):
+// { checked_at, since, paid_30d, paid_all, generated, holding: { amount, count, parcels },
+//   cprs: [{ cpr, generated_at, settled, settled_at, amount, cod, charges, delivered, returns, count, parcels }] }
+export async function getPaymentsReport() {
+  if (!sb) return (await demo()).paymentsReport();
+  return unwrap(await sb.rpc("courier_payments_report"));
+}
 // kind: "awb" (airway bills) or "loadsheet"; at most 10 orders → PDF Blob
 export const postexPdf = (kind, ids) => postex(kind, { ids });
 

@@ -80,7 +80,7 @@ export default function Dashboard() {
           label="Earnings, 30 days"
           value={compactMoney(stats.earnings_30d ?? stats.delivered_30d_amount ?? 0)}
           note={earningsNote(stats)}
-          to="/admin/orders?status=delivered"
+          to="/admin/payments"
         />
         <Tile
           label={stats.returns_to_check > 0 ? "Returns to check" : "Returned to you"}

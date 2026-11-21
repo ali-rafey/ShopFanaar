@@ -3704,3 +3704,160 @@ textarea.adm-input {
   margin-left: auto;
   color: var(--a-danger);
 }
+
+/* ------------------------------------------------------------ PostEx payments */
+.adm-pay-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+.adm-pay-check.is-off {
+  color: var(--a-danger);
+}
+.adm-pay-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.adm-pay-h {
+  margin: 4px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.adm-cprs {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.adm-cpr {
+  min-width: 0;
+  background: var(--a-surface);
+  border: 1px solid var(--a-line);
+  border-radius: var(--a-radius);
+}
+.adm-cpr summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.adm-cpr summary::-webkit-details-marker {
+  display: none;
+}
+.adm-cpr-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-cpr-title {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.adm-cpr-sub {
+  color: var(--a-muted);
+  font-size: 12.5px;
+}
+.adm-cpr-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: none;
+}
+.adm-cpr-side b {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.adm-cpr-sum {
+  margin: 0 16px;
+  padding: 10px 0 6px;
+  border-top: 1px solid var(--a-line);
+}
+.adm-cpr-parcels {
+  list-style: none;
+  margin: 4px 16px 0;
+  padding: 0;
+  border-top: 1px solid var(--a-line);
+}
+.adm-cpr-parcels li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 13.5px;
+}
+.adm-cpr-parcels li + li {
+  border-top: 1px solid var(--a-line);
+}
+.adm-cpr-parcel-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.adm-cpr-parcel-main a {
+  color: var(--a-ink);
+  font-weight: 500;
+}
+.adm-cpr-parcel-main small {
+  color: var(--a-muted);
+  font-size: 12.5px;
+}
+.adm-cpr-parcel-main .adm-cpr-from {
+  display: inline;
+}
+.adm-cpr-parcels b {
+  flex: none;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.adm-cpr-parcels b.is-neg {
+  color: var(--a-danger);
+}
+.adm-cpr-parcels.is-standalone {
+  margin: 0 0 18px;
+  padding: 2px 16px;
+  border-top: 1px solid var(--a-line);
+}
+.adm-cpr-foot {
+  margin: 0;
+  padding: 8px 16px 12px;
+  color: var(--a-muted);
+  font-size: 12px;
+}
+.adm-pay-foot {
+  margin: 0 0 24px;
+}
+
+@media (max-width: 1100px) {
+  .adm-pay-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  .adm-pay-tiles {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .adm-cpr {
+    border-width: 0.5px;
+    border-radius: 14px;
+  }
+  .adm-cpr summary {
+    padding: 12px 14px 12px 16px;
+  }
+}

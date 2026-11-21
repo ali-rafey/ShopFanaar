@@ -1,6 +1,6 @@
 // PostEx from the admin: book orders, link bookings made in the PostEx
-// portal, sync parcel progress, cancel bookings and print airway bills / load
-// sheets. Only signed-in admins get in: every request carries the admin's
+// portal, sync parcel progress, cancel bookings, print airway bills / load
+// sheets, and keep the record of PostEx's payments (CPRs) up to date. Only signed-in admins get in: every request carries the admin's
 // Supabase session, which is checked with is_admin(), and every database
 // write goes through the courier_* functions in
 // supabase/migrations/*_courier_postex.sql using that same session.
@@ -425,6 +425,89 @@ async function sync(db) {
   return out;
 }
 
+// PostEx payments (CPRs), for Overview → Earnings → PostEx payments: bring
+// courier_payments up to date. Parcels come from get-all-order (status, the
+// cash collected, PostEx's charges); each delivered or returned parcel that
+// isn't paid yet is asked which CPR it went into and whether that's closed.
+// Paid parcels never change, so they aren't asked again, and after the first
+// run only the window from the oldest unpaid parcel (or 45 days) is listed.
+const FIRST_BOOKING = "2025-01-01"; // before Fanaar's first PostEx parcel
+const IN_A_CPR = /^(delivered|return)/i; // statuses that end up in a CPR
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+async function payments(db) {
+  const now = Date.now();
+  const [any] = await db("courier_payments?select=tracking_number&limit=1");
+  const open = await db(
+    `courier_payments?select=booked_at&settled=is.false&booked_at=gte.${new Date(now - 365 * DAY).toISOString()}` +
+      `&order=booked_at.asc&limit=1`
+  );
+  const from = !any
+    ? new Date(FIRST_BOOKING)
+    : new Date(Math.min(open[0] ? Date.parse(open[0].booked_at) : Infinity, now - 45 * DAY) - 2 * DAY);
+  const paid = new Set(
+    (await db(`courier_payments?select=tracking_number&settled=is.true&booked_at=gte.${from.toISOString()}`)).map(
+      (r) => r.tracking_number
+    )
+  );
+
+  const rows = (await postex.listOrders(from, new Date(now))).filter((r) => r && r.trackingNumber);
+  const toCheck = rows
+    .filter((r) => IN_A_CPR.test(String(r.transactionStatus || "").trim()) && !paid.has(String(r.trackingNumber)))
+    .map((r) => String(r.trackingNumber));
+  let failed = 0;
+  const checked = new Map(
+    (
+      await mapLimit(toCheck, 4, async (tracking) => {
+        try {
+          return [tracking, await postex.paymentStatus(tracking)];
+        } catch {
+          failed += 1;
+          return [tracking, null];
+        }
+      })
+    ).filter(([, s]) => s)
+  );
+
+  const save = rows.map((r) => {
+    const tracking = String(r.trackingNumber);
+    const s = checked.get(tracking);
+    return {
+      tracking_number: tracking,
+      ref: String(r.orderRefNumber || "").trim() || null,
+      booked_at: postex.pakistanTime(r.transactionDate),
+      status: String(r.transactionStatus || "").trim(),
+      cod: Math.round(Number(r.invoicePayment) || 0),
+      fee: round2(Number(r.transactionFee || 0) + Number(r.transactionTax || 0)),
+      return_fee: round2(Number(r.reversalFee || 0) + Number(r.reversalTax || 0)),
+      ...(s
+        ? {
+            checked: true,
+            cpr: s.cpr1 || null,
+            cpr_at: postex.pakistanTime(s.cpr1Date),
+            settled: s.settle === true,
+            settled_at: postex.pakistanTime(s.settlementDate),
+          }
+        : {}),
+    };
+  });
+  if (save.length) await db("rpc/courier_save_payments", { method: "POST", body: { p_rows: save } });
+  return { listed: rows.length, checked: checked.size, failed, checkedAt: new Date().toISOString() };
+}
+
 async function cancel(db, body) {
   if (!UUID.test(String(body.id))) throw new HttpError(400, "Which order?");
   const [order] = await db(`orders?select=id,order_number,courier,tracking_number&id=eq.${body.id}`);
@@ -468,6 +551,7 @@ export default async function handler(req, res) {
     if (action === "book") return res.status(200).json(await book(db, body));
     if (action === "sync") return res.status(200).json(await sync(db));
     if (action === "cancel") return res.status(200).json(await cancel(db, body));
+    if (action === "payments") return res.status(200).json(await payments(db));
     if (action === "awb" || action === "loadsheet") {
       const tracking = await trackingFor(db, body, MAX_PDF[action]);
       const pdf = action === "awb" ? await postex.airwayBills(tracking) : await postex.loadSheet(tracking);

@@ -795,7 +795,8 @@ export function getOrder(id) {
   });
 }
 
-// Mirrors set_order_discount in *_order_discount.sql.
+// Mirrors set_order_discount in *_discount_items_only.sql (off the items;
+// delivery is never discounted).
 export function setOrderDiscount(id, discount, percent = null) {
   return tx((d) => {
     const o = d.orders.find((x) => x.id === id);
@@ -804,13 +805,14 @@ export function setOrderDiscount(id, discount, percent = null) {
     if (o.tracking_number) {
       fail(`This order is already booked with ${o.courier || "a courier"}. Cancel the booking first, then change the discount and book it again.`);
     }
-    const full = o.subtotal + o.shipping_fee;
     const next = Number(discount) || 0;
-    if (next < 0 || next > full) fail(`The discount must be between Rs.0 and the order total, Rs.${full.toLocaleString("en-PK")}.`);
+    if (next < 0 || next > o.subtotal) {
+      fail(`The discount must be between Rs.0 and the items total, Rs.${o.subtotal.toLocaleString("en-PK")} (delivery isn't discounted).`);
+    }
     if (percent != null && (percent <= 0 || percent > 100)) fail("The percentage must be more than 0 and at most 100.");
     if (next === (o.discount || 0)) return { discount: o.discount || 0, total: o.total };
     o.discount = next;
-    o.total = full - next;
+    o.total = o.subtotal + o.shipping_fee - next;
     o.updated_at = now();
     const rs = (n) => `Rs.${n.toLocaleString("en-PK")}`;
     addEvent(
@@ -895,6 +897,90 @@ function demoStatus(d, o, status, note) {
   addEvent(d, o.id, "status", status, note);
 }
 
+// ------------------------------------------------------------ PostEx payments
+// Mirrors courier_payments_report in *_courier_payments.sql, on made-up
+// parcels: three closed CPRs, one generated, and a few parcels PostEx holds.
+
+function demoPayments() {
+  const day = 864e5;
+  const at = (daysAgo) => new Date(Date.now() - daysAgo * day).toISOString();
+  let n = 0;
+  const parcel = (status, cod, fee, cpr, generated, paid, booked) => ({
+    tracking_number: `2939777009${String(++n).padStart(4, "0")}`,
+    ref: String(1100 + n),
+    booked_at: at(booked),
+    status,
+    cod,
+    fee: status === "Delivered" ? fee : 0,
+    return_fee: status === "Return" ? fee : 0,
+    cpr,
+    cpr_at: cpr ? at(generated) : null,
+    settled: paid != null,
+    settled_at: paid != null ? at(paid) : null,
+  });
+  return [
+    ...[2429, 2229, 4729, 2029].map((c) => parcel("Delivered", c, 294.35, "CPR-DEMO0001", 26, 25.8, 33)),
+    parcel("Return", 2429, 311.17, "CPR-DEMO0001", 26, 25.8, 33),
+    ...[2429, 2429, 1829].map((c) => parcel("Delivered", c, 294.35, "CPR-DEMO0002", 12, 11.8, 18)),
+    ...[2029, 4229, 2229, 2429, 2029].map((c) => parcel("Delivered", c, 294.35, "CPR-DEMO0003", 5, 4.8, 10)),
+    parcel("Return", 2229, 294.35, "CPR-DEMO0003", 5, 4.8, 10),
+    ...[2429, 2029].map((c) => parcel("Delivered", c, 294.35, "CPR-DEMO0004", 0.2, null, 6)),
+    parcel("Delivered", 2229, 294.35, null, null, null, 3),
+    parcel("Return", 2029, 311.17, null, null, null, 4),
+    parcel("Transferred", 2429, 0, null, null, null, 1),
+  ];
+}
+
+export function paymentsReport() {
+  return tx((d) => {
+    const rows = (d.courier_payments || []).map((p) => {
+      const order = d.orders.find((o) => o.tracking_number === p.tracking_number);
+      return {
+        ...p,
+        net: Math.round(((/^delivered$/i.test(p.status) ? p.cod : 0) - p.fee - p.return_fee) * 100) / 100,
+        order_id: order?.id ?? null,
+        order_number: order?.order_number ?? null,
+      };
+    });
+    const r2 = (x) => Math.round(x * 100) / 100;
+    const sum = (list, f) => r2(list.reduce((s, x) => s + f(x), 0));
+    const parcelJson = (p) => ({
+      tracking: p.tracking_number, ref: p.ref, booked_at: p.booked_at, order_id: p.order_id,
+      order_number: p.order_number, status: p.status, cod: p.cod, fee: p.fee, return_fee: p.return_fee, net: p.net,
+    });
+    const groups = new Map();
+    rows.filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
+    const cprs = [...groups].map(([cpr, list]) => ({
+      cpr,
+      generated_at: list.map((p) => p.cpr_at).sort()[0],
+      settled: list.every((p) => p.settled),
+      settled_at: list.map((p) => p.settled_at).filter(Boolean).sort().at(-1) ?? null,
+      amount: sum(list, (p) => p.net),
+      cod: list.filter((p) => /^delivered$/i.test(p.status)).reduce((s, p) => s + p.cod, 0),
+      charges: sum(list, (p) => p.fee + p.return_fee),
+      delivered: list.filter((p) => /^delivered$/i.test(p.status)).length,
+      returns: list.filter((p) => /^return/i.test(p.status)).length,
+      count: list.length,
+      parcels: list.map(parcelJson),
+    }));
+    cprs.sort((a, b) => String(b.settled_at || b.generated_at).localeCompare(String(a.settled_at || a.generated_at)));
+    const month = Date.now() - 30 * 864e5;
+    const paid = cprs.filter((c) => c.settled);
+    const recent = paid.filter((c) => Date.parse(c.settled_at) > month);
+    const open = cprs.filter((c) => !c.settled);
+    const holding = rows.filter((p) => !p.cpr && /^(delivered|return)/i.test(p.status));
+    return {
+      checked_at: rows.length ? new Date().toISOString() : null,
+      since: rows.filter((p) => p.settled).map((p) => p.settled_at).sort()[0] ?? null,
+      paid_30d: { amount: sum(recent, (c) => c.amount), count: recent.length },
+      paid_all: { amount: sum(paid, (c) => c.amount), count: paid.length },
+      generated: { amount: sum(open, (c) => c.amount), count: open.length },
+      holding: { amount: sum(holding, (p) => p.net), count: holding.length, parcels: holding.map(parcelJson) },
+      cprs,
+    };
+  });
+}
+
 export function postex(action, payload = {}) {
   return tx((d) => {
     d.cityAliases ||= {};
@@ -905,6 +991,10 @@ export function postex(action, payload = {}) {
         addresses: [{ code: "001", city: "Faisalabad", address: "Demo warehouse, Faisalabad", isDefault: true }],
         learned: d.cityAliases,
       };
+    }
+    if (action === "payments") {
+      d.courier_payments ||= demoPayments();
+      return { listed: d.courier_payments.length, checked: 0, failed: 0, checkedAt: now() };
     }
     if (action === "book") {
       const results = payload.orders.map(({ id, city: chosen }) => {
