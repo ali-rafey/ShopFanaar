@@ -931,6 +931,94 @@ function demoPayments() {
   ];
 }
 
+// Mirrors *_earnings.sql: money received from 1 Jan 2026 — closed CPRs (at
+// the amount entered, or PostEx's figure), orders handed over in person, and
+// amounts added by hand.
+const EARNINGS_START = "2025-12-31T19:00:00.000Z"; // 1 Jan 2026, Pakistan time
+
+function earningLines(d) {
+  const groups = new Map();
+  (d.courier_payments || []).filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
+  const amounts = d.cpr_amounts || {};
+  const net = (p) => (/^delivered$/i.test(p.status) ? p.cod : 0) - p.fee - p.return_fee;
+  const postex = [...groups]
+    .filter(([, list]) => list.every((p) => p.settled))
+    .map(([cpr, list]) => ({
+      kind: "postex",
+      ref: cpr,
+      amount: amounts[cpr]?.amount ?? Math.round(list.reduce((s, p) => s + net(p), 0) * 100) / 100,
+      at: list.map((p) => p.settled_at).sort().at(-1),
+    }));
+  const inPerson = d.orders
+    .filter((o) => o.status === "delivered" && !o.tracking_number)
+    .map((o) => ({ kind: "in_person", ref: `#${o.order_number}`, amount: o.total, at: o.updated_at || o.created_at }));
+  const added = (d.earning_entries || []).map((e) => ({
+    kind: "added",
+    ref: e.note,
+    amount: e.amount,
+    at: new Date(`${e.earned_on}T12:00:00+05:00`).toISOString(),
+  }));
+  return [...postex, ...inPerson, ...added].filter((l) => l.at >= EARNINGS_START);
+}
+
+function summarise(lines) {
+  const month = new Date(Date.now() - 30 * 864e5).toISOString();
+  const sum = (list) => Math.round(list.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
+  const block = (list) => ({
+    total: sum(list),
+    postex: sum(list.filter((l) => l.kind === "postex")),
+    in_person: sum(list.filter((l) => l.kind === "in_person")),
+    added: sum(list.filter((l) => l.kind === "added")),
+  });
+  return {
+    since: EARNINGS_START,
+    d30: block(lines.filter((l) => l.at > month)),
+    all: { ...block(lines), in_person_count: lines.filter((l) => l.kind === "in_person").length },
+  };
+}
+
+export function earningsSummary() {
+  return tx((d) => summarise(earningLines(d)));
+}
+
+export function setCprAmount(cpr, amount, note = null) {
+  return tx((d) => {
+    if (!(d.courier_payments || []).some((p) => p.cpr === cpr)) fail(`No PostEx payment ${cpr}.`);
+    d.cpr_amounts ||= {};
+    if (amount == null) {
+      delete d.cpr_amounts[cpr];
+      return { cpr, amount: null };
+    }
+    if (amount < 0) fail("Enter the amount you received, in rupees.");
+    d.cpr_amounts[cpr] = { amount: Math.round(amount * 100) / 100, note: note?.trim() || null, updated_at: now() };
+    return { cpr, amount: d.cpr_amounts[cpr].amount };
+  });
+}
+
+export function saveEarning(id, entry) {
+  return tx((d) => {
+    if (!entry.earned_on || entry.earned_on < "2026-01-01") fail("Choose a date from 1 January 2026.");
+    if (!(Number(entry.amount) > 0)) fail("Enter an amount above zero.");
+    if (!String(entry.note || "").trim()) fail("Say what it was for.");
+    d.earning_entries ||= [];
+    const row = { earned_on: entry.earned_on, amount: Number(entry.amount), note: entry.note.trim() };
+    if (id) {
+      const e = d.earning_entries.find((x) => x.id === id);
+      if (!e) fail("That amount is gone.");
+      return Object.assign(e, row);
+    }
+    const e = { id: crypto.randomUUID(), created_at: now(), ...row };
+    d.earning_entries.push(e);
+    return e;
+  });
+}
+
+export function deleteEarning(id) {
+  return tx((d) => {
+    d.earning_entries = (d.earning_entries || []).filter((x) => x.id !== id);
+  });
+}
+
 export function paymentsReport() {
   return tx((d) => {
     const rows = (d.courier_payments || []).map((p) => {
@@ -950,19 +1038,30 @@ export function paymentsReport() {
     });
     const groups = new Map();
     rows.filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
-    const cprs = [...groups].map(([cpr, list]) => ({
-      cpr,
-      generated_at: list.map((p) => p.cpr_at).sort()[0],
-      settled: list.every((p) => p.settled),
-      settled_at: list.map((p) => p.settled_at).filter(Boolean).sort().at(-1) ?? null,
-      amount: sum(list, (p) => p.net),
-      cod: list.filter((p) => /^delivered$/i.test(p.status)).reduce((s, p) => s + p.cod, 0),
-      charges: sum(list, (p) => p.fee + p.return_fee),
-      delivered: list.filter((p) => /^delivered$/i.test(p.status)).length,
-      returns: list.filter((p) => /^return/i.test(p.status)).length,
-      count: list.length,
-      parcels: list.map(parcelJson),
-    }));
+    const amounts = d.cpr_amounts || {};
+    const cprs = [...groups]
+      .map(([cpr, list]) => {
+        const postex = sum(list, (p) => p.net);
+        const set = amounts[cpr];
+        return {
+          cpr,
+          generated_at: list.map((p) => p.cpr_at).sort()[0],
+          settled: list.every((p) => p.settled),
+          settled_at: list.map((p) => p.settled_at).filter(Boolean).sort().at(-1) ?? null,
+          amount: set ? set.amount : postex,
+          postex_amount: postex,
+          adjusted: Boolean(set),
+          note: set?.note ?? null,
+          adjusted_at: set?.updated_at ?? null,
+          cod: list.filter((p) => /^delivered$/i.test(p.status)).reduce((s, p) => s + p.cod, 0),
+          charges: sum(list, (p) => p.fee + p.return_fee),
+          delivered: list.filter((p) => /^delivered$/i.test(p.status)).length,
+          returns: list.filter((p) => /^return/i.test(p.status)).length,
+          count: list.length,
+          parcels: list.map(parcelJson),
+        };
+      })
+      .filter((c) => (c.settled_at || c.generated_at) >= EARNINGS_START);
     cprs.sort((a, b) => String(b.settled_at || b.generated_at).localeCompare(String(a.settled_at || a.generated_at)));
     const month = Date.now() - 30 * 864e5;
     const paid = cprs.filter((c) => c.settled);
@@ -971,12 +1070,14 @@ export function paymentsReport() {
     const holding = rows.filter((p) => !p.cpr && /^(delivered|return)/i.test(p.status));
     return {
       checked_at: rows.length ? new Date().toISOString() : null,
-      since: rows.filter((p) => p.settled).map((p) => p.settled_at).sort()[0] ?? null,
+      since: EARNINGS_START,
+      earnings: summarise(earningLines(d)),
       paid_30d: { amount: sum(recent, (c) => c.amount), count: recent.length },
       paid_all: { amount: sum(paid, (c) => c.amount), count: paid.length },
       generated: { amount: sum(open, (c) => c.amount), count: open.length },
       holding: { amount: sum(holding, (p) => p.net), count: holding.length, parcels: holding.map(parcelJson) },
       cprs,
+      entries: [...(d.earning_entries || [])].sort((a, b) => b.earned_on.localeCompare(a.earned_on)),
     };
   });
 }

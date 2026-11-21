@@ -431,7 +431,8 @@ async function sync(db) {
 // isn't paid yet is asked which CPR it went into and whether that's closed.
 // Paid parcels never change, so they aren't asked again, and after the first
 // run only the window from the oldest unpaid parcel (or 45 days) is listed.
-const FIRST_BOOKING = "2025-01-01"; // before Fanaar's first PostEx parcel
+// Earnings count from 1 Jan 2026; December parcels can be paid in January.
+const FIRST_BOOKING = "2025-12-01";
 const IN_A_CPR = /^(delivered|return)/i; // statuses that end up in a CPR
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 

@@ -8,12 +8,43 @@ import LiveGlobe from "../LiveGlobe";
 import Funnel from "../Funnel";
 import { countryName, flag, pageName, placeName } from "../names";
 
+// Earnings (the tile, and Overview → Earnings): the money received since
+// 1 Jan 2026 — PostEx payments, orders handed over in person, and amounts
+// added by hand (api.getEarningsSummary). The Earnings page shares this key.
+const PAYMENTS_CHECKED_KEY = "fanaar-payments-checked";
+
 export default function Dashboard() {
   const { stats, version } = useFeed();
   const toDo = useLoad(
     () => Promise.all(["pending", "confirmed", "packed"].map((status) => api.listOrders({ status, limit: 8 }))),
     [version]
   );
+  const earnings = useLoad(() => api.getEarningsSummary(), [version]);
+  const reloadEarnings = earnings.reload;
+
+  // Keep PostEx's payments fresh for the Earnings tile: ask PostEx at most
+  // every 30 minutes when the Overview opens (the Earnings page asks every time).
+  useEffect(() => {
+    if (api.BACKEND !== "supabase") return;
+    let last = 0;
+    try {
+      last = Number(localStorage.getItem(PAYMENTS_CHECKED_KEY)) || 0;
+    } catch {
+      /* fine — check now */
+    }
+    if (Date.now() - last < 30 * 60e3) return;
+    api.postexPayments().then(
+      () => {
+        try {
+          localStorage.setItem(PAYMENTS_CHECKED_KEY, String(Date.now()));
+        } catch {
+          /* fine */
+        }
+        reloadEarnings();
+      },
+      () => {}
+    );
+  }, [reloadEarnings]);
 
   // Nudge towards phone notifications until this device has them.
   const [nudge, setNudge] = useState(false);
@@ -78,8 +109,8 @@ export default function Dashboard() {
         />
         <Tile
           label="Earnings, 30 days"
-          value={compactMoney(stats.earnings_30d ?? stats.delivered_30d_amount ?? 0)}
-          note={earningsNote(stats)}
+          value={earnings.data ? compactMoney(earnings.data.d30.total) : "…"}
+          note={earnings.data ? `${compactMoney(earnings.data.all.total)} since Jan 2026` : "Money received"}
           to="/admin/payments"
         />
         <Tile
@@ -390,18 +421,6 @@ function Bars({ title, rows, total }) {
       </ul>
     </div>
   );
-}
-
-// Earnings = cash PostEx collected on delivered parcels − its fee (about
-// Rs 380 a parcel, delivered or returned) + orders handed over in person.
-// e.g. "Rs 41K sales − Rs 6.3K PostEx fees · Rs 34.6K all time"
-function earningsNote(stats) {
-  const sales = (stats.delivered_30d_amount || 0) + (stats.handover_30d_amount || 0);
-  const bits = [
-    `${compactMoney(sales)} sales`,
-    stats.courier_fees_30d > 0 && `− ${compactMoney(stats.courier_fees_30d)} PostEx fees`,
-  ].filter(Boolean);
-  return `${bits.join(" ")} · ${compactMoney(stats.earnings_all ?? stats.delivered_all_amount ?? 0)} all time`;
 }
 
 // e.g. "Rs 16K · 24% return rate · 1 on the way back"

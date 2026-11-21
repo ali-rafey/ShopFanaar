@@ -276,12 +276,44 @@ export const postexCancel = (id) => postex("cancel", { id });
 // Ask PostEx about payments (CPRs) and save what's new → { listed, checked, failed, checkedAt }.
 export const postexPayments = () => postex("payments", {});
 
-// PostEx's payments (CPRs) as saved by postexPayments (*_courier_payments.sql):
-// { checked_at, since, paid_30d, paid_all, generated, holding: { amount, count, parcels },
-//   cprs: [{ cpr, generated_at, settled, settled_at, amount, cod, charges, delivered, returns, count, parcels }] }
+// Overview → Earnings (*_courier_payments.sql, *_earnings.sql), from 1 Jan 2026:
+// { checked_at, since, earnings, paid_30d, paid_all, generated, holding: { amount, count, parcels },
+//   cprs: [{ cpr, generated_at, settled, settled_at, amount, postex_amount, adjusted, note, cod,
+//            charges, delivered, returns, count, parcels }],
+//   entries: [{ id, earned_on, amount, note }] }
 export async function getPaymentsReport() {
   if (!sb) return (await demo()).paymentsReport();
   return unwrap(await sb.rpc("courier_payments_report"));
+}
+
+// The money received since 1 Jan 2026 — PostEx payments (at the amount
+// entered for a CPR, or PostEx's figure), orders handed over in person, and
+// amounts added by hand: { since, d30: { total, postex, in_person, added }, all: { … } }.
+export async function getEarningsSummary() {
+  if (!sb) return (await demo()).earningsSummary();
+  return unwrap(await sb.rpc("earnings_summary"));
+}
+
+// The exact amount received for a CPR; null goes back to PostEx's figure.
+export async function setCprAmount(cpr, amount, note = null) {
+  if (!sb) return (await demo()).setCprAmount(cpr, amount, note);
+  return unwrap(await sb.rpc("set_cpr_amount", { p_cpr: cpr, p_amount: amount, p_note: note }));
+}
+
+// Money received some other way: { earned_on: "YYYY-MM-DD", amount, note }.
+export async function saveEarning(id, entry) {
+  if (!sb) return (await demo()).saveEarning(id, entry);
+  const row = { earned_on: entry.earned_on, amount: entry.amount, note: entry.note };
+  return unwrap(
+    id
+      ? await sb.from("earning_entries").update(row).eq("id", id).select().single()
+      : await sb.from("earning_entries").insert(row).select().single()
+  );
+}
+
+export async function deleteEarning(id) {
+  if (!sb) return (await demo()).deleteEarning(id);
+  unwrap(await sb.from("earning_entries").delete().eq("id", id));
 }
 // kind: "awb" (airway bills) or "loadsheet"; at most 10 orders → PDF Blob
 export const postexPdf = (kind, ids) => postex(kind, { ids });
