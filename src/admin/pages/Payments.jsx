@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "../api";
 import { ConfirmButton, ErrorBox, fmtDate, money, PageHead, Spinner, timeAgo, useLoad, useToast } from "../ui";
 
-// Overview → Earnings: the money received since 1 Jan 2026 — PostEx payments
-// (CPRs, cash payment receipts), orders handed over in person, and amounts
-// the admin adds. A CPR is "generated" when PostEx puts parcels into a
+// Overview → Earnings: the money received — PostEx payments (CPRs, cash
+// payment receipts) and orders handed over in person since 1 Jan 2026, plus
+// amounts the admin adds for any date (e.g. before 2026), which count in All
+// time and, when recent, in the last 30 days. A CPR is "generated" when PostEx puts parcels into a
 // payment and "closed" once it has paid it; PostEx's figure for it is close to
 // what reaches the bank but not exact, so the admin can enter the amount
 // received. The saved record shows straight away; the page then asks PostEx
@@ -32,7 +33,12 @@ function breakdown(b) {
 export default function Payments() {
   const report = useLoad(() => api.getPaymentsReport(), []);
   const [check, setCheck] = useState({ state: "checking" });
-  const { reload } = report;
+  const [version, setVersion] = useState(0); // bumps whenever earnings change, so the period refreshes
+  const { reload: reloadReport } = report;
+  const reload = useCallback(() => {
+    reloadReport();
+    setVersion((v) => v + 1);
+  }, [reloadReport]);
 
   useEffect(() => {
     let alive = true;
@@ -44,7 +50,7 @@ export default function Payments() {
           /* fine */
         }
         if (!alive) return;
-        setCheck({ state: "done", at: r.checkedAt, failed: r.failed });
+        setCheck({ state: "done", at: r.checkedAt, failed: r.failed, markedPaid: r.markedPaid || [] });
         reload();
       },
       (e) => alive && setCheck({ state: "failed", error: e.message })
@@ -63,7 +69,7 @@ export default function Payments() {
       <PageHead
         back={<Link to="/admin" className="adm-back">Overview</Link>}
         title="Earnings"
-        sub="Money received since 1 Jan 2026: PostEx payments, orders handed over in person, and amounts you add."
+        sub="Money received: PostEx payments and orders handed over in person since 1 Jan 2026, plus amounts you add for any date."
       />
 
       <CheckLine check={check} savedAt={data?.checked_at} />
@@ -82,7 +88,7 @@ export default function Payments() {
               <span className="adm-tile-note">{breakdown(e.d30)}</span>
             </div>
             <div className="adm-tile">
-              <span className="adm-tile-label">Since Jan 2026</span>
+              <span className="adm-tile-label">All time</span>
               <span className="adm-tile-value">{rs(e.all.total)}</span>
               <span className="adm-tile-note">{breakdown(e.all)}</span>
             </div>
@@ -103,6 +109,8 @@ export default function Payments() {
               </span>
             </div>
           </section>
+
+          <Period version={version} />
 
           <h2 className="adm-pay-h">PostEx payments (CPRs)</h2>
           {data.cprs.length === 0 ? (
@@ -130,11 +138,158 @@ export default function Payments() {
 
           <p className="adm-hint adm-pay-foot">
             A CPR counts at PostEx&apos;s own figure (cash collected minus their charges) until you enter the amount
-            you received. Orders handed over in person count at their total on the day they were marked delivered.
+            you received. When PostEx closes a CPR, the orders it delivered in that payment are marked paid. Orders
+            handed over in person count at their total once they&apos;re marked paid.
           </p>
         </>
       )}
     </>
+  );
+}
+
+// ------------------------------------------------------------- a period
+// Earnings between any two dates (api.getEarningsBetween), Pakistan calendar
+// days with both ends included: "45 days" is today and the 44 days before.
+
+const PRESETS = [
+  { key: "7", label: "7 days" },
+  { key: "30", label: "30 days" },
+  { key: "45", label: "45 days" },
+  { key: "90", label: "90 days" },
+  { key: "month", label: "This month" },
+  { key: "lastmonth", label: "Last month" },
+  { key: "year", label: "This year" },
+  { key: "custom", label: "Custom" },
+];
+const pkToday = () => new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 10);
+const shiftDay = (ymd, n) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const dayCount = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5) + 1;
+
+function rangeFor(key, custom) {
+  const today = pkToday();
+  if (/^\d+$/.test(key)) return { from: shiftDay(today, -(Number(key) - 1)), to: today };
+  const [y, m] = today.split("-").map(Number);
+  if (key === "month") return { from: `${today.slice(0, 7)}-01`, to: today };
+  if (key === "lastmonth") {
+    return {
+      from: new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10),
+      to: new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10),
+    };
+  }
+  if (key === "year") return { from: `${y}-01-01`, to: today };
+  return custom;
+}
+
+// "9 Oct – 22 Nov 2026", "1–30 Nov 2026"
+function rangeLabel(from, to) {
+  const f = new Date(`${from}T12:00:00Z`);
+  const t = new Date(`${to}T12:00:00Z`);
+  const day = (d, opts) => d.toLocaleDateString("en-GB", { timeZone: "UTC", ...opts });
+  if (from === to) return day(t, { day: "numeric", month: "short", year: "numeric" });
+  const sameYear = f.getUTCFullYear() === t.getUTCFullYear();
+  return `${day(f, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })} – ${day(t, { day: "numeric", month: "short", year: "numeric" })}`;
+}
+
+const LINE_KIND = { postex: "PostEx", in_person: "in person", added: "added" };
+
+function Period({ version }) {
+  const [key, setKey] = useState("month");
+  const [custom, setCustom] = useState(() => ({ from: shiftDay(pkToday(), -44), to: pkToday() }));
+  const range = rangeFor(key, custom);
+  const valid = Boolean(range.from && range.to) && range.from <= range.to;
+  const res = useLoad(
+    () => (valid ? api.getEarningsBetween(range.from, range.to) : Promise.resolve(null)),
+    [range.from, range.to, valid, version]
+  );
+  const data = res.data;
+
+  return (
+    <section className="adm-card adm-period" aria-label="Earnings for a period">
+      <h2 className="adm-pay-h">Pick a period</h2>
+      <div className="adm-tabs adm-period-tabs" role="tablist" aria-label="Period">
+        {PRESETS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            role="tab"
+            aria-selected={key === p.key}
+            className={key === p.key ? "on" : ""}
+            onClick={() => setKey(p.key)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {key === "custom" && (
+        <div className="adm-earn-row">
+          <label className="adm-field">
+            <span>From</span>
+            <input
+              className="adm-input"
+              type="date"
+              max={pkToday()}
+              value={custom.from}
+              onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
+            />
+          </label>
+          <label className="adm-field">
+            <span>To</span>
+            <input
+              className="adm-input"
+              type="date"
+              max={pkToday()}
+              value={custom.to}
+              onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+            />
+          </label>
+        </div>
+      )}
+
+      {!valid ? (
+        <p className="adm-field-error">Choose a start date on or before the end date.</p>
+      ) : res.error ? (
+        <ErrorBox error={res.error} onRetry={res.reload} />
+      ) : !data ? (
+        <p className="adm-hint">Adding it up…</p>
+      ) : (
+        <>
+          <div className="adm-period-total">
+            <strong>{rs(data.total)}</strong>
+            <span>
+              {rangeLabel(range.from, range.to)} · {dayCount(range.from, range.to)}{" "}
+              {dayCount(range.from, range.to) === 1 ? "day" : "days"}
+            </span>
+          </div>
+          <p className="adm-hint">{breakdown(data)}</p>
+          {data.lines.length > 0 && (
+            <details className="adm-period-lines">
+              <summary>
+                What&apos;s in it ({data.lines.length})
+              </summary>
+              <ul>
+                {data.lines.map((l, i) => (
+                  <li key={`${l.kind}-${l.ref}-${i}`}>
+                    <span>
+                      {l.kind === "in_person" ? `Order ${l.ref}` : l.ref}
+                      <small>
+                        {new Date(l.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} ·{" "}
+                        {LINE_KIND[l.kind]}
+                      </small>
+                    </span>
+                    <b>{rs(l.amount)}</b>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -157,6 +312,8 @@ function CheckLine({ check, savedAt }) {
   return (
     <p className="adm-pay-check">
       Up to date with PostEx · checked {timeAgo(check.at)}
+      {check.markedPaid?.length > 0 &&
+        ` · marked ${check.markedPaid.length === 1 ? "order" : "orders"} ${check.markedPaid.map((n) => `#${n}`).join(", ")} paid`}
       {check.failed > 0 && ` · ${check.failed} ${check.failed === 1 ? "parcel" : "parcels"} couldn't be checked, next time will`}
     </p>
   );
@@ -396,7 +553,7 @@ function EntryForm({ entry, onDone, onCancel }) {
   const [busy, setBusy] = useState(false);
   const set = (k) => (ev) => setForm((f) => ({ ...f, [k]: ev.target.value }));
   const amountOk = AMOUNT.test(form.amount.trim()) && Number(form.amount) > 0;
-  const dateOk = form.earned_on >= "2026-01-01" && form.earned_on <= today();
+  const dateOk = form.earned_on >= "2000-01-01" && form.earned_on <= today();
   const valid = amountOk && dateOk && form.note.trim().length > 0;
 
   async function run(work, done) {
@@ -441,7 +598,7 @@ function EntryForm({ entry, onDone, onCancel }) {
           <input
             className={`adm-input ${dateOk ? "" : "bad"}`}
             type="date"
-            min="2026-01-01"
+            min="2000-01-01"
             max={today()}
             value={form.earned_on}
             onChange={set("earned_on")}
@@ -458,7 +615,10 @@ function EntryForm({ entry, onDone, onCancel }) {
           onChange={set("note")}
         />
       </label>
-      {!dateOk && <span className="adm-field-error">Choose a date from 1 Jan 2026 up to today.</span>}
+      {!dateOk && <span className="adm-field-error">Choose a date up to today.</span>}
+      {dateOk && form.earned_on < new Date(Date.now() - 30 * 864e5).toLocaleDateString("en-CA") && (
+        <span className="adm-hint">Older than 30 days: it counts in All time, not in the last 30 days.</span>
+      )}
       <div className="adm-btns">
         <button type="submit" className="adm-btn primary" disabled={!valid || busy}>
           {entry ? "Save" : "Add amount"}

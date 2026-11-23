@@ -294,6 +294,14 @@ export async function getEarningsSummary() {
   return unwrap(await sb.rpc("earnings_summary"));
 }
 
+// Earnings between two Pakistan dates, both included ("YYYY-MM-DD"; null from
+// = from the start, null to = today) → { from, to, total, postex, in_person,
+// added, lines: [{ kind, ref, amount, at }] } (*_earnings_periods.sql).
+export async function getEarningsBetween(from, to) {
+  if (!sb) return (await demo()).earningsBetween(from, to);
+  return unwrap(await sb.rpc("earnings_between", { p_from: from, p_to: to }));
+}
+
 // The exact amount received for a CPR; null goes back to PostEx's figure.
 export async function setCprAmount(cpr, amount, note = null) {
   if (!sb) return (await demo()).setCprAmount(cpr, amount, note);

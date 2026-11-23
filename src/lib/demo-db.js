@@ -950,7 +950,7 @@ function earningLines(d) {
       at: list.map((p) => p.settled_at).sort().at(-1),
     }));
   const inPerson = d.orders
-    .filter((o) => o.status === "delivered" && !o.tracking_number)
+    .filter((o) => o.status === "delivered" && !o.tracking_number && o.payment_status === "paid")
     .map((o) => ({ kind: "in_person", ref: `#${o.order_number}`, amount: o.total, at: o.updated_at || o.created_at }));
   const added = (d.earning_entries || []).map((e) => ({
     kind: "added",
@@ -958,11 +958,41 @@ function earningLines(d) {
     amount: e.amount,
     at: new Date(`${e.earned_on}T12:00:00+05:00`).toISOString(),
   }));
-  return [...postex, ...inPerson, ...added].filter((l) => l.at >= EARNINGS_START);
+  // PostEx payments and in-person orders count from 1 Jan 2026; added amounts for any date.
+  return [...postex, ...inPerson].filter((l) => l.at >= EARNINGS_START).concat(added);
+}
+
+// Pakistan calendar days, like *_earnings_periods.sql: "YYYY-MM-DD".
+const pkDay = (at) => new Date(Date.parse(at) + 5 * 3600e3).toISOString().slice(0, 10);
+const shiftDay = (ymd, n) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+export function earningsBetween(from, to) {
+  return tx((d) => {
+    const end = to || pkDay(new Date().toISOString());
+    if (from && from > end) fail("The start date is after the end date.");
+    const lines = earningLines(d)
+      .filter((l) => (!from || pkDay(l.at) >= from) && pkDay(l.at) <= end)
+      .sort((a, b) => b.at.localeCompare(a.at));
+    const sum = (list) => Math.round(list.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
+    return {
+      from: from || null,
+      to: end,
+      total: sum(lines),
+      postex: sum(lines.filter((l) => l.kind === "postex")),
+      in_person: sum(lines.filter((l) => l.kind === "in_person")),
+      added: sum(lines.filter((l) => l.kind === "added")),
+      lines: lines.map(({ kind, ref, amount, at }) => ({ kind, ref, amount, at })),
+    };
+  });
 }
 
 function summarise(lines) {
-  const month = new Date(Date.now() - 30 * 864e5).toISOString();
+  // The last 30 days = today and the 29 days before, Pakistan time.
+  const month = new Date(`${shiftDay(pkDay(new Date().toISOString()), -29)}T00:00:00+05:00`).toISOString();
   const sum = (list) => Math.round(list.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
   const block = (list) => ({
     total: sum(list),
@@ -972,7 +1002,7 @@ function summarise(lines) {
   });
   return {
     since: EARNINGS_START,
-    d30: block(lines.filter((l) => l.at > month)),
+    d30: block(lines.filter((l) => l.at >= month)),
     all: { ...block(lines), in_person_count: lines.filter((l) => l.kind === "in_person").length },
   };
 }
@@ -997,7 +1027,7 @@ export function setCprAmount(cpr, amount, note = null) {
 
 export function saveEarning(id, entry) {
   return tx((d) => {
-    if (!entry.earned_on || entry.earned_on < "2026-01-01") fail("Choose a date from 1 January 2026.");
+    if (!entry.earned_on || entry.earned_on < "2000-01-01") fail("Choose a date.");
     if (!(Number(entry.amount) > 0)) fail("Enter an amount above zero.");
     if (!String(entry.note || "").trim()) fail("Say what it was for.");
     d.earning_entries ||= [];
@@ -1095,7 +1125,7 @@ export function postex(action, payload = {}) {
     }
     if (action === "payments") {
       d.courier_payments ||= demoPayments();
-      return { listed: d.courier_payments.length, checked: 0, failed: 0, checkedAt: now() };
+      return { listed: d.courier_payments.length, checked: 0, failed: 0, markedPaid: [], checkedAt: now() };
     }
     if (action === "book") {
       const results = payload.orders.map(({ id, city: chosen }) => {

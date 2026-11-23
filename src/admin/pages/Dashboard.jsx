@@ -8,9 +8,9 @@ import LiveGlobe from "../LiveGlobe";
 import Funnel from "../Funnel";
 import { countryName, flag, pageName, placeName } from "../names";
 
-// Earnings (the tile, and Overview → Earnings): the money received since
-// 1 Jan 2026 — PostEx payments, orders handed over in person, and amounts
-// added by hand (api.getEarningsSummary). The Earnings page shares this key.
+// Earnings (the tile, and Overview → Earnings): the money received — PostEx
+// payments and in-person orders since 1 Jan 2026, plus amounts added by hand
+// for any date (api.getEarningsSummary). The Earnings page shares this key.
 const PAYMENTS_CHECKED_KEY = "fanaar-payments-checked";
 
 export default function Dashboard() {
@@ -110,7 +110,7 @@ export default function Dashboard() {
         <Tile
           label="Earnings, 30 days"
           value={earnings.data ? compactMoney(earnings.data.d30.total) : "…"}
-          note={earnings.data ? `${compactMoney(earnings.data.all.total)} since Jan 2026` : "Money received"}
+          note={earnings.data ? `${compactMoney(earnings.data.all.total)} all time` : "Money received"}
           to="/admin/payments"
         />
         <Tile

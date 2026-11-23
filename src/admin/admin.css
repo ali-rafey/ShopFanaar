@@ -3931,3 +3931,69 @@ textarea.adm-input {
 .adm-earn-empty small {
   padding: 4px 0;
 }
+
+/* ------------------------------------------------------------ earnings for a period */
+.adm-period .adm-pay-h {
+  margin: 0 0 10px;
+}
+.adm-period-tabs {
+  margin-bottom: 12px;
+}
+.adm-period-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.adm-period-total strong {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.adm-period-total span {
+  color: var(--a-muted);
+  font-size: 13px;
+}
+.adm-period-lines {
+  margin-top: 10px;
+  border-top: 1px solid var(--a-line);
+  padding-top: 8px;
+}
+.adm-period-lines summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 4px 0;
+}
+.adm-period-lines ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.adm-period-lines li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 13.5px;
+}
+.adm-period-lines li + li {
+  border-top: 1px solid var(--a-line);
+}
+.adm-period-lines li span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.adm-period-lines li small {
+  color: var(--a-muted);
+  font-size: 12.5px;
+}
+.adm-period-lines li b {
+  flex: none;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

@@ -506,7 +506,9 @@ async function payments(db) {
     };
   });
   if (save.length) await db("rpc/courier_save_payments", { method: "POST", body: { p_rows: save } });
-  return { listed: rows.length, checked: checked.size, failed, checkedAt: new Date().toISOString() };
+  // Orders whose parcels PostEx has now paid for → paid (once each; *_courier_mark_paid.sql).
+  const markedPaid = await db("rpc/courier_mark_paid", { method: "POST", body: {} });
+  return { listed: rows.length, checked: checked.size, failed, markedPaid, checkedAt: new Date().toISOString() };
 }
 
 async function cancel(db, body) {
