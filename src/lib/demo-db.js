@@ -936,18 +936,75 @@ function demoPayments() {
 // amounts added by hand.
 const EARNINGS_START = "2025-12-31T19:00:00.000Z"; // 1 Jan 2026, Pakistan time
 
+// Mirrors *_cpr_closing.sql: CPRs the admin has closed. Demo CPRs PostEx
+// "settled" before closing existed start closed, like the live ones did.
+function demoClosures(d) {
+  if (!d.cpr_closures) {
+    d.cpr_closures = {};
+    const groups = new Map();
+    (d.courier_payments || []).filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
+    for (const [cpr, list] of groups) {
+      if (list.every((p) => p.settled)) d.cpr_closures[cpr] = { closed_at: list.map((p) => p.settled_at).sort().at(-1) };
+    }
+  }
+  return d.cpr_closures;
+}
+
+export function closeCpr(cpr, amount = null, note = null) {
+  return tx((d) => {
+    if (!(d.courier_payments || []).some((p) => p.cpr === cpr)) fail(`No PostEx payment ${cpr}.`);
+    const closures = demoClosures(d);
+    if (closures[cpr]) fail(`${cpr} is already closed.`);
+    if (amount != null) {
+      d.cpr_amounts ||= {};
+      d.cpr_amounts[cpr] = { amount: Math.round(amount * 100) / 100, note: note?.trim() || null, updated_at: now() };
+    }
+    closures[cpr] = { closed_at: now() };
+    const marked = [];
+    for (const p of d.courier_payments.filter((x) => x.cpr === cpr && /^delivered$/i.test(x.status))) {
+      const o = d.orders.find((x) => x.tracking_number === p.tracking_number && x.courier === "PostEx");
+      if (!o || o.payment_status !== "unpaid" || ["cancelled", "returned"].includes(o.status)) continue;
+      o.payment_status = "paid";
+      addEvent(d, o.id, "payment", null, "Payment marked paid");
+      addEvent(d, o.id, "payment", null, `Paid by PostEx in ${cpr} (closed ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})`);
+      marked.push(o.order_number);
+    }
+    return { cpr, marked: marked.sort((a, b) => a - b) };
+  });
+}
+
+export function reopenCpr(cpr) {
+  return tx((d) => {
+    const closures = demoClosures(d);
+    if (!closures[cpr]) fail(`${cpr} isn't closed.`);
+    delete closures[cpr];
+    const unmarked = [];
+    for (const p of (d.courier_payments || []).filter((x) => x.cpr === cpr)) {
+      const o = d.orders.find((x) => x.tracking_number === p.tracking_number);
+      const byThis = o && d.events.some((e) => e.order_id === o.id && e.kind === "payment" && String(e.message).startsWith(`Paid by PostEx in ${cpr} (`));
+      if (!o || o.payment_status !== "paid" || !byThis) continue;
+      o.payment_status = "unpaid";
+      addEvent(d, o.id, "payment", null, `Back to unpaid: ${cpr} was reopened`);
+      unmarked.push(o.order_number);
+    }
+    return { cpr, unmarked: unmarked.sort((a, b) => a - b) };
+  });
+}
+
 function earningLines(d) {
   const groups = new Map();
   (d.courier_payments || []).filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
   const amounts = d.cpr_amounts || {};
   const net = (p) => (/^delivered$/i.test(p.status) ? p.cod : 0) - p.fee - p.return_fee;
+  // A CPR counts once it's closed in Fanaar, on the day it was closed.
+  const closures = demoClosures(d);
   const postex = [...groups]
-    .filter(([, list]) => list.every((p) => p.settled))
+    .filter(([cpr]) => closures[cpr])
     .map(([cpr, list]) => ({
       kind: "postex",
       ref: cpr,
       amount: amounts[cpr]?.amount ?? Math.round(list.reduce((s, p) => s + net(p), 0) * 100) / 100,
-      at: list.map((p) => p.settled_at).sort().at(-1),
+      at: closures[cpr].closed_at,
     }));
   const inPerson = d.orders
     .filter((o) => o.status === "delivered" && !o.tracking_number && o.payment_status === "paid")
@@ -1069,15 +1126,19 @@ export function paymentsReport() {
     const groups = new Map();
     rows.filter((p) => p.cpr).forEach((p) => groups.set(p.cpr, [...(groups.get(p.cpr) || []), p]));
     const amounts = d.cpr_amounts || {};
+    const closures = demoClosures(d);
     const cprs = [...groups]
       .map(([cpr, list]) => {
         const postex = sum(list, (p) => p.net);
         const set = amounts[cpr];
+        const closedAt = closures[cpr]?.closed_at ?? null;
         return {
           cpr,
           generated_at: list.map((p) => p.cpr_at).sort()[0],
-          settled: list.every((p) => p.settled),
-          settled_at: list.map((p) => p.settled_at).filter(Boolean).sort().at(-1) ?? null,
+          closed: Boolean(closedAt),
+          closed_at: closedAt,
+          postex_settled: list.every((p) => p.settled),
+          to_mark: list.filter((p) => /^delivered$/i.test(p.status) && p.order_id && d.orders.find((o) => o.id === p.order_id)?.payment_status === "unpaid").length,
           amount: set ? set.amount : postex,
           postex_amount: postex,
           adjusted: Boolean(set),
@@ -1091,12 +1152,17 @@ export function paymentsReport() {
           parcels: list.map(parcelJson),
         };
       })
-      .filter((c) => (c.settled_at || c.generated_at) >= EARNINGS_START);
-    cprs.sort((a, b) => String(b.settled_at || b.generated_at).localeCompare(String(a.settled_at || a.generated_at)));
+      .filter((c) => (c.closed_at || c.generated_at) >= EARNINGS_START);
+    // Generated ones (waiting to be closed) first, then newest.
+    cprs.sort(
+      (a, b) =>
+        Number(a.closed) - Number(b.closed) ||
+        String(b.closed_at || b.generated_at).localeCompare(String(a.closed_at || a.generated_at))
+    );
     const month = Date.now() - 30 * 864e5;
-    const paid = cprs.filter((c) => c.settled);
-    const recent = paid.filter((c) => Date.parse(c.settled_at) > month);
-    const open = cprs.filter((c) => !c.settled);
+    const paid = cprs.filter((c) => c.closed);
+    const recent = paid.filter((c) => Date.parse(c.closed_at) > month);
+    const open = cprs.filter((c) => !c.closed);
     const holding = rows.filter((p) => !p.cpr && /^(delivered|return)/i.test(p.status));
     return {
       checked_at: rows.length ? new Date().toISOString() : null,

@@ -97,7 +97,7 @@ export default function Payments() {
               <span className="adm-tile-value">{rs(data.generated.amount)}</span>
               <span className="adm-tile-note">
                 {data.generated.count
-                  ? `${data.generated.count} ${data.generated.count === 1 ? "CPR" : "CPRs"}, not paid yet`
+                  ? `${data.generated.count} ${data.generated.count === 1 ? "CPR" : "CPRs"} to close when PostEx pays`
                   : "Nothing waiting"}
               </span>
             </div>
@@ -137,9 +137,9 @@ export default function Payments() {
           )}
 
           <p className="adm-hint adm-pay-foot">
-            A CPR counts at PostEx&apos;s own figure (cash collected minus their charges) until you enter the amount
-            you received. When PostEx closes a CPR, the orders it delivered in that payment are marked paid. Orders
-            handed over in person count at their total once they&apos;re marked paid.
+            A new CPR stays Generated until you close it here, once the PostEx portal shows it Closed. Closing marks
+            the orders PostEx delivered in it paid and counts it in earnings that day, at the amount you enter
+            (PostEx&apos;s own figure to start with). Orders handed over in person count once they&apos;re marked paid.
           </p>
         </>
       )}
@@ -319,9 +319,12 @@ function CheckLine({ check, savedAt }) {
   );
 }
 
+// A CPR is "Generated" until the admin closes it here — PostEx's API can't
+// tell when PostEx has actually paid (its portal's New / Closed). Closing marks
+// the orders PostEx delivered in it paid and counts it in earnings.
 function Cpr({ cpr: c, onChanged }) {
   const facts = [
-    c.settled ? `Paid ${fmtDate(c.settled_at)}` : `Generated ${fmtDate(c.generated_at)} · not paid yet`,
+    c.closed ? `Closed ${fmtDate(c.closed_at)}` : `Generated ${fmtDate(c.generated_at)} · not closed yet`,
     `${c.delivered} delivered`,
     c.returns > 0 && `${c.returns} returned`,
   ].filter(Boolean);
@@ -334,8 +337,8 @@ function Cpr({ cpr: c, onChanged }) {
             <span className="adm-cpr-sub">{facts.join(" · ")}</span>
           </span>
           <span className="adm-cpr-side">
-            <span className={`adm-stage ${c.settled ? "adm-stage-order" : "adm-stage-checkout"}`}>
-              {c.settled ? "Closed" : "Generated"}
+            <span className={`adm-stage ${c.closed ? "adm-stage-order" : "adm-stage-checkout"}`}>
+              {c.closed ? "Closed" : "Generated"}
             </span>
             <b>{signed(c.amount)}</b>
             {c.adjusted && <small className="adm-cpr-was">PostEx {signed(c.postex_amount)}</small>}
@@ -357,25 +360,138 @@ function Cpr({ cpr: c, onChanged }) {
           {c.adjusted && (
             <div className="grand">
               <dt>
-                {c.settled ? "You received" : "You expect"}
+                {c.closed ? "You received" : "You expect"}
                 {c.note && <small className="adm-cpr-note">{c.note}</small>}
               </dt>
               <dd>{signed(c.amount)}</dd>
             </div>
           )}
         </dl>
-        <CprAmount cpr={c} onChanged={onChanged} />
+        {c.closed ? <CprAmount cpr={c} onChanged={onChanged} /> : <CloseCpr cpr={c} onChanged={onChanged} />}
         <ul className="adm-cpr-parcels">
           {c.parcels.map((p) => (
             <Parcel key={p.tracking} parcel={p} />
           ))}
         </ul>
-        <p className="adm-cpr-foot">
-          Generated {fmtDate(c.generated_at)}
-          {c.settled && c.settled_at ? ` · closed ${fmtDate(c.settled_at)}` : ""}
-        </p>
+        <div className="adm-cpr-foot">
+          <span>
+            Generated {fmtDate(c.generated_at)}
+            {c.closed && c.closed_at ? ` · closed ${fmtDate(c.closed_at)}` : ""}
+          </span>
+          {c.closed && <ReopenCpr cpr={c} onChanged={onChanged} />}
+        </div>
       </details>
     </li>
+  );
+}
+
+// Close a generated CPR once PostEx shows it Closed (paid): the amount
+// received — PostEx's figure to start with — then a second tap to confirm.
+function CloseCpr({ cpr: c, onChanged }) {
+  const toast = useToast();
+  const [amount, setAmount] = useState(String(Math.round(c.amount)));
+  const [note, setNote] = useState(c.note || "");
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const valid = AMOUNT.test(amount);
+  const orders = `${c.to_mark} ${c.to_mark === 1 ? "order" : "orders"}`;
+
+  async function close() {
+    setBusy(true);
+    try {
+      const n = Number(amount);
+      // Keep PostEx's exact figure unless the amount or note was changed.
+      const changed = n !== Math.round(c.amount) || (note.trim() || null) !== (c.note || null);
+      const r = await api.closeCpr(c.cpr, changed ? n : null, changed ? note.trim() || null : null);
+      toast(r.marked.length ? `${c.cpr} closed · ${r.marked.length} ${r.marked.length === 1 ? "order" : "orders"} marked paid` : `${c.cpr} closed`);
+      onChanged();
+    } catch (err) {
+      toast(err.message || "Couldn't close it.", "err");
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="adm-cpr-edit is-open adm-cpr-close"
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (valid) setConfirming(true);
+      }}
+    >
+      <p className="adm-cpr-close-lead">
+        Close it once PostEx shows it <strong>Closed</strong> (paid). Its delivered orders are then marked paid.
+      </p>
+      <label className="adm-field">
+        <span>Amount received (Rs.)</span>
+        <input
+          className={`adm-input ${amount && !valid ? "bad" : ""}`}
+          inputMode="decimal"
+          value={amount}
+          onChange={(ev) => {
+            setAmount(ev.target.value.trim());
+            setConfirming(false);
+          }}
+        />
+        <span className="adm-hint">PostEx&apos;s figure is {signed(c.postex_amount)}. Change it to what PostEx actually paid.</span>
+      </label>
+      <label className="adm-field">
+        <span>Note (optional)</span>
+        <input
+          className="adm-input"
+          placeholder="e.g. as in the PostEx portal"
+          maxLength={200}
+          value={note}
+          onChange={(ev) => setNote(ev.target.value)}
+        />
+      </label>
+      <div className="adm-btns">
+        {confirming ? (
+          <>
+            <button type="button" className="adm-btn primary" disabled={busy} onClick={close}>
+              {c.to_mark > 0 ? `Close & mark ${orders} paid` : "Yes, close it"}
+            </button>
+            <button type="button" className="adm-btn" disabled={busy} onClick={() => setConfirming(false)}>
+              Not yet
+            </button>
+          </>
+        ) : (
+          <button type="submit" className="adm-btn primary" disabled={!valid || busy}>
+            Close CPR
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+// Closed by mistake: back to Generated, out of earnings, and the orders its
+// closing marked paid go back to unpaid.
+function ReopenCpr({ cpr: c, onChanged }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <ConfirmButton
+      className="adm-link adm-cpr-reopen"
+      confirmLabel="Reopen? Its orders go back to unpaid"
+      disabled={busy}
+      onConfirm={async () => {
+        setBusy(true);
+        try {
+          const r = await api.reopenCpr(c.cpr);
+          toast(r.unmarked.length ? `${c.cpr} reopened · ${r.unmarked.length} ${r.unmarked.length === 1 ? "order" : "orders"} back to unpaid` : `${c.cpr} reopened`);
+          onChanged();
+        } catch (err) {
+          toast(err.message || "Couldn't reopen it.", "err");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      Reopen
+    </ConfirmButton>
   );
 }
 

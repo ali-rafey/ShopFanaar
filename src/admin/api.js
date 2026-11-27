@@ -302,6 +302,19 @@ export async function getEarningsBetween(from, to) {
   return unwrap(await sb.rpc("earnings_between", { p_from: from, p_to: to }));
 }
 
+// Close a generated CPR (PostEx has paid it): optionally the exact amount
+// received; marks the orders PostEx delivered in it paid → { cpr, marked: [order numbers] }.
+export async function closeCpr(cpr, amount = null, note = null) {
+  if (!sb) return (await demo()).closeCpr(cpr, amount, note);
+  return unwrap(await sb.rpc("close_cpr", { p_cpr: cpr, p_amount: amount, p_note: note }));
+}
+
+// Closed by mistake: back to generated; its orders back to unpaid → { cpr, unmarked: [...] }.
+export async function reopenCpr(cpr) {
+  if (!sb) return (await demo()).reopenCpr(cpr);
+  return unwrap(await sb.rpc("reopen_cpr", { p_cpr: cpr }));
+}
+
 // The exact amount received for a CPR; null goes back to PostEx's figure.
 export async function setCprAmount(cpr, amount, note = null) {
   if (!sb) return (await demo()).setCprAmount(cpr, amount, note);
